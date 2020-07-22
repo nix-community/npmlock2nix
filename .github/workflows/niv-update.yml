@@ -1,0 +1,16 @@
+name: Automated niv update
+on:
+  schedule:
+    - cron: '0 0 * * *'
+jobs:
+  niv-updater:
+    name: Create PRs for niv-managed dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: niv-updater-action
+        uses: knl/niv-updater-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          title_prefix: "niv:"
+          github_changelog_no_backreferences: true
