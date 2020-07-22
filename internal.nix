@@ -1,5 +1,6 @@
 { nodejs, stdenv, mkShell, lib, fetchurl, writeText }:
 rec {
+  default_nodejs = nodejs;
 
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
@@ -64,6 +65,7 @@ rec {
     , packageLockJson ? src + "/package-lock.json"
     , buildInputs ? [ ]
     , nativeBuildInputs ? [ ]
+    , nodejs ? default_nodejs
     , ...
     }@args:
     let
@@ -96,6 +98,10 @@ rec {
           mv node_modules $out/
         fi
       '';
+
+      passthru = {
+        inherit nodejs;
+      };
     };
 
   shell = attrs:

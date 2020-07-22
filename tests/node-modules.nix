@@ -47,6 +47,14 @@ testLib.runTests {
         touch $out
       '');
       expected = true;
-  };
+    };
+
+    testNodeModulesAcceptsCustomNodejs = {
+      expr = (npmlock2nix.node_modules {
+          src = ./examples-projects/no-dependencies;
+          nodejs = "our-custom-nodejs-package";
+        }).nodejs;
+      expected = "our-custom-nodejs-package";
+    };
 
 }

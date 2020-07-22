@@ -19,6 +19,7 @@ Put the following in your `shell.nix`:
 { pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
 npmlock2nix.shell {
   src = ./.;
+  nodejs = pkgs.nodejs-14_x;
 }
 ```
 
