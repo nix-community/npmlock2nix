@@ -93,7 +93,6 @@ rec {
       '';
       installPhase = ''
         mkdir $out
-        set -x
         if test -d node_modules; then
           mv node_modules $out/
         fi
