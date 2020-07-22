@@ -109,7 +109,7 @@ rec {
       nm = node_modules attrs;
     in
     mkShell {
-      buildInputs = [ nodejs ];
+      buildInputs = [ nm.nodejs ];
       shellHook = ''
         export NODE_PATH="${nm}/node_modules:$NODE_PATH"
       '';
