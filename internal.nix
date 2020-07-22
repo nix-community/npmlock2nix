@@ -93,7 +93,6 @@ rec {
       '';
       installPhase = ''
         mkdir $out
-        set -x
         if test -d node_modules; then
           mv node_modules $out/
         fi
@@ -109,7 +108,7 @@ rec {
       nm = node_modules attrs;
     in
     mkShell {
-      buildInputs = [ nodejs ];
+      buildInputs = [ nm.passthru.nodejs ];
       shellHook = ''
         export NODE_PATH="${nm}/node_modules:$NODE_PATH"
       '';
