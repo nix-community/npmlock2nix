@@ -111,7 +111,7 @@ rec {
     mkShell {
       buildInputs = [ nodejs ];
       shellHook = ''
-        export NODE_PATH=${nm}
+        export NODE_PATH="${nm}/node_modules:$NODE_PATH"
       '';
       passthru.node_modules = nm;
     };
