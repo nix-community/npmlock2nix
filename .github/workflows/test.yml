@@ -15,5 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: cachix/install-nix-action@v10
+      - run: nix-shell ./tests/examples-projects/single-dependency/shell.nix --run "node -e 'console.log(require(\"leftpad\")(123, 7));'"
       - run: ./integration-tests/tests.sh
 
