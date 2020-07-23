@@ -11,4 +11,5 @@ in
   patch-lockfile = callPackage ./patch-lockfile.nix {};
   node-modules = callPackage ./node-modules.nix {};
   shell = callPackage ./shell.nix {};
+  integration-tests = callPackage ./integration-tests {};
 }

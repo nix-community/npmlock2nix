@@ -1,4 +1,4 @@
-{ pkgs ? import ./nix }:
+{ pkgs ? import ./nix  {} }:
 let
   internal = pkgs.callPackage ./internal.nix {};
 in {
