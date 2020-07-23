@@ -10,4 +10,5 @@ in
   make-source-urls = callPackage ./make-source-urls.nix {};
   patch-lockfile = callPackage ./patch-lockfile.nix {};
   node-modules = callPackage ./node-modules.nix {};
+  shell = callPackage ./shell.nix {};
 }
