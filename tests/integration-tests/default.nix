@@ -6,6 +6,14 @@ testLib.makeIntegrationTests {
     command = ''
       node -e 'console.log(require("leftpad")(123, 7));'
     '';
-    expected = "0000123";
+    expected = "0000123\n";
+  };
+  nodejsVersion = {
+    description = "Specify nodejs version to use";
+    shell = import ../examples-projects/nodejs-version-shell/shell.nix {};
+    command = ''
+      node -e 'console.log(process.versions.node.split(".")[0]);'
+    '';
+    expected = "10\n";
   };
 }

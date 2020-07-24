@@ -1,8 +1,8 @@
 { lib
-, writeScript
+, writeTextFile
 , writeShellScript
 , nix
-, bats
+, smoke
 , coreutils
 }: {
   runTests = tests:
@@ -26,31 +26,28 @@
     let
       mkTestScript = name: shell: command:
         let
-          shellDrv = builtins.unsafeDiscardStringContext shell.drvPath;
-        in
+          shellDrv = (shell.overrideAttrs (_:{ phases = [ "noopPhase" ]; noopPhase = "touch $out"; })).drvPath; in
         writeShellScript name ''
           export PATH="${nix}/bin:${coreutils}/bin"
           exec nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" command}"
         '';
       testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test.shell test.command; inherit name; }) tests;
 
-      text = lib.concatMapStringsSep "\n"
-        (test: ''
-          @test "${test.name} - ${test.description}" {
-            run ${test.script}
+      smokeConfig.tests = map (test: {
+        inherit (test) name;
+        command = test.script;
+        stdout = test.expected;
+        exit-status = test.status or 0;
+      }) (lib.attrValues testScripts);
 
-            echo $output > /tmp/debug.log
-
-            [[ "$status" -eq ${test.status or "0"} ]]
-            [[ "$output" = "${test.expected}" ]]
-          }
-        '')
-        (builtins.attrValues testScripts);
-
+      testScriptDir = writeTextFile {
+        name = "smoke.yml";
+        destination = "/smoke.yaml";
+        text = builtins.toJSON smokeConfig;
+      };
     in
-    writeScript "tests.bats" ''
-      #!${bats}/bin/bats
-      ${text}
+    writeShellScript "tests" ''
+      exec ${smoke}/bin/smoke ${testScriptDir}
     '';
 
 }
