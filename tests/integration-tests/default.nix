@@ -10,7 +10,7 @@ testLib.makeIntegrationTests {
   };
   nodejsVersion = {
     description = "Specify nodejs version to use";
-    shell = import ../examples-projects/nodejs-version-shell/shell.nix {};
+    shell = import ../examples-projects/nodejs-version-shell/shell.nix { };
     command = ''
       node -e 'console.log(process.versions.node.split(".")[0]);'
     '';

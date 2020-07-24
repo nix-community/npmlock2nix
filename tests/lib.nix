@@ -26,19 +26,21 @@
     let
       mkTestScript = name: shell: command:
         let
-          shellDrv = (shell.overrideAttrs (_:{ phases = [ "noopPhase" ]; noopPhase = "touch $out"; })).drvPath; in
+          shellDrv = (shell.overrideAttrs (_: { phases = [ "noopPhase" ]; noopPhase = "touch $out"; })).drvPath; in
         writeShellScript name ''
           export PATH="${nix}/bin:${coreutils}/bin"
           exec nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" command}"
         '';
       testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test.shell test.command; inherit name; }) tests;
 
-      smokeConfig.tests = map (test: {
-        inherit (test) name;
-        command = test.script;
-        stdout = test.expected;
-        exit-status = test.status or 0;
-      }) (lib.attrValues testScripts);
+      smokeConfig.tests = map
+        (test: {
+          inherit (test) name;
+          command = test.script;
+          stdout = test.expected;
+          exit-status = test.status or 0;
+        })
+        (lib.attrValues testScripts);
 
       testScriptDir = writeTextFile {
         name = "smoke.yml";

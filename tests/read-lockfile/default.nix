@@ -30,7 +30,7 @@ in
         name = "no-dependencies";
         version = "1.0.0";
         lockfileVersion = 1;
-        dependencies = {};
+        dependencies = { };
       };
     };
 })

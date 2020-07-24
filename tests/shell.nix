@@ -15,7 +15,7 @@ testLib.runTests {
     in
     {
       expr = {
-        inherit(drv) buildInputs;
+        inherit (drv) buildInputs;
         node_modules_nodejs = drv.node_modules.nodejs;
       };
       expected = {

@@ -3,7 +3,7 @@ testLib.runTests {
 
   testPatchLockfileWithoutDependencies = {
     expr = (npmlock2nix.internal.patchLockfile ./examples-projects/no-dependencies/package-lock.json).dependencies;
-    expected = {};
+    expected = { };
   };
 
   testPatchDependencyDoesntDropAttributes = {
@@ -12,14 +12,14 @@ testLib.runTests {
       foo = "something";
       resolved = "https://examples.com/something.tgz";
       integrity = "sha1-00000000000000000000000+0RU=";
-      dependencies = {};
+      dependencies = { };
     };
     expected = {
       a = 1;
       foo = "something";
       resolved = "file:///nix/store/k2rgngn9cmhz4g3kzxmvhx5r40qvnwcf-something.tgz";
       integrity = "sha1-00000000000000000000000+0RU=";
-      dependencies = {};
+      dependencies = { };
     };
   };
 
@@ -48,9 +48,11 @@ testLib.runTests {
   };
 
   testPatchLockfileTurnsUrlsIntoStorePaths = {
-    expr = let
-      deps = (npmlock2nix.internal.patchLockfile ./examples-projects/single-dependency/package-lock.json).dependencies;
-    in lib.count (dep: lib.hasPrefix "file:///nix/store/" dep.resolved) (lib.attrValues deps);
+    expr =
+      let
+        deps = (npmlock2nix.internal.patchLockfile ./examples-projects/single-dependency/package-lock.json).dependencies;
+      in
+      lib.count (dep: lib.hasPrefix "file:///nix/store/" dep.resolved) (lib.attrValues deps);
     expected = 1;
   };
 

@@ -18,43 +18,51 @@ testLib.runTests {
 
 
   testNodeModulesForEmptyDependenciesHasNodeModulesFolder = {
-      expr = let
+    expr =
+      let
         drv = npmlock2nix.node_modules {
           src = ./examples-projects/no-dependencies;
         };
-      in  builtins.pathExists (drv + "/node_modules");
-      expected = false;
+      in
+      builtins.pathExists (drv + "/node_modules");
+    expected = false;
   };
 
   testNodeModulesForSimpleProjectHasLeftPad = {
-      expr = let
+    expr =
+      let
         drv = npmlock2nix.node_modules {
           src = ./examples-projects/single-dependency;
         };
-      in  builtins.pathExists (drv + "/node_modules/leftpad");
-      expected = true;
+      in
+      builtins.pathExists (drv + "/node_modules/leftpad");
+    expected = true;
   };
   testNodeModulesForSimpleProjectCanUseLeftPad = {
-      expr = let
+    expr =
+      let
         drv = npmlock2nix.node_modules {
           src = ./examples-projects/single-dependency;
         };
-      in builtins.pathExists (runCommand "test-leftpad" {
-        buildInputs = [ nodejs ];
-      } ''
+      in
+      builtins.pathExists (runCommand "test-leftpad"
+        {
+          buildInputs = [ nodejs ];
+        } ''
         ln -s ${drv}/node_modules node_modules
         node -e "require('leftpad')"
         touch $out
-      '');
-      expected = true;
-    };
+      ''
+      );
+    expected = true;
+  };
 
-    testNodeModulesAcceptsCustomNodejs = {
-      expr = (npmlock2nix.node_modules {
-          src = ./examples-projects/no-dependencies;
-          nodejs = "our-custom-nodejs-package";
-        }).nodejs;
-      expected = "our-custom-nodejs-package";
-    };
+  testNodeModulesAcceptsCustomNodejs = {
+    expr = (npmlock2nix.node_modules {
+      src = ./examples-projects/no-dependencies;
+      nodejs = "our-custom-nodejs-package";
+    }).nodejs;
+    expected = "our-custom-nodejs-package";
+  };
 
 }
