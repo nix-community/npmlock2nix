@@ -1,11 +1,12 @@
 {}:
 let
   sources = import ./sources.nix;
-in import sources.nixpkgs {
+in
+import sources.nixpkgs {
   overlays = [
     (self: super: {
-      npmlock2nix = self.callPackage ../default.nix {};
-      inherit (self.callPackage (import sources.smoke) {}) smoke;
+      npmlock2nix = self.callPackage ../default.nix { };
+      inherit (self.callPackage (import sources.smoke) { }) smoke;
     })
   ];
 }

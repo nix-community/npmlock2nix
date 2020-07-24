@@ -1,10 +1,11 @@
-{ pkgs ? import ./nix  {} }:
+{ pkgs ? import ./nix { } }:
 let
-  internal = pkgs.callPackage ./internal.nix {};
-in {
+  internal = pkgs.callPackage ./internal.nix { };
+in
+{
   inherit (internal) shell build node_modules;
 
-  tests = pkgs.callPackage ./tests {};
+  tests = pkgs.callPackage ./tests { };
 
 
   # *** WARNING ****
@@ -12,5 +13,6 @@ in {
   # being said, hiding them would only lead to copy&paste and it is also useful
   # for testing internal building blocks.
   internal = builtins.trace "npmlock2nix: You are using the unsupported internal API." (
-    internal);
+    internal
+  );
 }
