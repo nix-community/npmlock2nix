@@ -98,6 +98,9 @@ rec {
         mkdir $out
         if test -d node_modules; then
           mv node_modules $out/
+          if test -d $out/node_modules/.bin; then
+            ln -s $out/node_modules/.bin $out/bin
+          fi
         fi
       '';
 
@@ -111,7 +114,7 @@ rec {
       nm = node_modules attrs;
     in
     mkShell {
-      buildInputs = [ nm.nodejs ];
+      buildInputs = [ nm.nodejs nm ];
       shellHook = ''
         export NODE_PATH="${nm}/node_modules:$NODE_PATH"
       '';
