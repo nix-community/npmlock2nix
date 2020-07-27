@@ -1,6 +1,21 @@
 { npmlock2nix, testLib, lib }:
 testLib.runTests {
 
+  testBundledDependenciesAreRetained = {
+    expr = npmlock2nix.internal.patchDependency "test" {
+      bundled = true;
+      integrity = "sha1-hrGk3k+s4YCsVFqD8VA1I9j+0RU=";
+      something = "bar";
+      dependencies = { };
+    };
+    expected = {
+      bundled = true;
+      integrity = "sha1-hrGk3k+s4YCsVFqD8VA1I9j+0RU=";
+      something = "bar";
+      dependencies = { };
+    };
+  };
+
   testPatchLockfileWithoutDependencies = {
     expr = (npmlock2nix.internal.patchLockfile ./examples-projects/no-dependencies/package-lock.json).dependencies;
     expected = { };
