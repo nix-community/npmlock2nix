@@ -19,7 +19,7 @@ testLib.runTests {
         node_modules_nodejs = drv.node_modules.nodejs;
       };
       expected = {
-        buildInputs = [ custom_nodejs ];
+        buildInputs = [ custom_nodejs drv.node_modules ];
         node_modules_nodejs = custom_nodejs;
       };
     };
