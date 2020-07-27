@@ -16,4 +16,12 @@ testLib.makeIntegrationTests {
     '';
     expected = "10\n";
   };
+  pathContainsNodeApplications = {
+    description = "Applications from the node_modules/.bin folder should be available on $PATH in the shell expression";
+    shell = npmlock2nix.shell { src = ../examples-projects/bin-project; };
+    command = ''
+      mkdirp --version
+    '';
+    expected = "1.0.4\n";
+  };
 }
