@@ -40,9 +40,12 @@ rec {
   patchDependency = name: spec:
     assert (builtins.typeOf name != "string") -> builtins.throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf spec != "set") -> builtins.throw "Spec of dependency ${toString name} must be a set";
-    spec // {
+    let
+      isBundled = spec ? bundled && spec.bundled == true;
+    in
+    spec // lib.optionalAttrs (!isBundled) ({
       resolved = "file://" + (toString (makeSource name spec));
-    } // lib.optionalAttrs (spec ? dependencies) {
+    }) // lib.optionalAttrs (spec ? dependencies) {
       dependencies = lib.mapAttrs patchDependency spec.dependencies;
     };
 
