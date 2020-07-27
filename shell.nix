@@ -6,6 +6,6 @@ let
   '';
 
 in
-pkgs.mkShell {
+pkgs.mkShellNoCC {
   buildInputs = [ test-runner pkgs.nodejs pkgs.smoke pkgs.niv pkgs.nixpkgs-fmt ];
 }

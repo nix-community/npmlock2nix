@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText }:
+{ nodejs, stdenv, mkShellNoCC, lib, fetchurl, writeText }:
 rec {
   default_nodejs = nodejs;
 
@@ -107,7 +107,7 @@ rec {
     let
       nm = node_modules attrs;
     in
-    mkShell {
+    mkShellNoCC {
       buildInputs = [ nm.nodejs ];
       shellHook = ''
         export NODE_PATH="${nm}/node_modules:$NODE_PATH"
