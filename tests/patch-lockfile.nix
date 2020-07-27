@@ -6,13 +6,13 @@ testLib.runTests {
       bundled = true;
       integrity = "sha1-hrGk3k+s4YCsVFqD8VA1I9j+0RU=";
       something = "bar";
-      dependencies = {};
+      dependencies = { };
     };
     expected = {
       bundled = true;
       integrity = "sha1-hrGk3k+s4YCsVFqD8VA1I9j+0RU=";
       something = "bar";
-      dependencies = {};
+      dependencies = { };
     };
   };
 

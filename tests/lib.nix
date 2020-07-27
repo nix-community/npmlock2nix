@@ -25,13 +25,15 @@
   makeIntegrationTests = tests:
     let
       mkTestScript = name: shell: command:
-        let
-          shellDrv = (shell.overrideAttrs (_: { phases = [ "noopPhase" ]; noopPhase = "touch $out"; })).drvPath; in
         writeShellScript name ''
           export PATH="${nix}/bin:${coreutils}/bin"
-          exec nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" command}"
+          nix-shell ${../.} -A tests.integration-tests.shells.${name} --command "${writeShellScript "${name}-command" command}"
         '';
-      testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test.shell test.command; inherit name; }) tests;
+      testScripts = lib.mapAttrs
+        (name: test:
+          test // { script = mkTestScript name test.shell test.command; inherit name;inherit (test) shell; }
+        )
+        tests;
 
       smokeConfig.tests = map
         (test: {
@@ -48,8 +50,11 @@
         text = builtins.toJSON smokeConfig;
       };
     in
-    writeShellScript "tests" ''
-      exec ${smoke}/bin/smoke ${testScriptDir}
-    '';
+    {
+      driver = writeShellScript "tests" ''
+        exec ${smoke}/bin/smoke ${testScriptDir}
+      '';
+      shells = lib.mapAttrs (_: test: test.shell) testScripts;
+    };
 
 }
