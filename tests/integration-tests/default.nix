@@ -75,7 +75,10 @@ testLib.makeIntegrationTests {
     '';
     command = ''
       webpack-cli --version
-      webpack --mode production > /dev/null
+      if ! webpack --mode production > .webpack.log 2>&1; then
+        cat .webpack.log
+        exit 1
+      fi
       if ! test -e dist/main.js; then
         echo "dist/main.js missing"
         exit 1
