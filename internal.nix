@@ -137,7 +137,30 @@ rec {
       passthru.node_modules = nm;
     };
 
-  build = attrs:
-    let nm = node_modules attrs; in
-    { };
+  build =
+    { src
+    , npmCommands
+    , installPhase
+    , symlink_node_modules ? true
+    , ...
+    }@attrs:
+    let
+      nm = node_modules attrs;
+    in
+    stdenv.mkDerivation {
+      pname = nm.pname;
+      version = nm.version;
+      buildInputs = [ nm ];
+
+      postUnpack = ''
+        ln -sf ${nm}/node_modules node_modules
+      '';
+
+      buildPhase = ''
+        runHook preBuild
+        ${lib.concatStringsSep "\n" npmCommands}
+        runHook postBuild
+      '';
+      inherit src installPhase;
+    };
 }

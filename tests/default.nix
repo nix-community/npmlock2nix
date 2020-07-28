@@ -12,4 +12,5 @@ in
   node-modules = callPackage ./node-modules.nix { };
   shell = callPackage ./shell.nix { };
   integration-tests = callPackage ./integration-tests { };
+  build-tests = callPackage ./build-tests.nix { };
 }

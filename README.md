@@ -34,9 +34,11 @@ Put the following in your `shell.nix`:
 ```nix
 { pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
 npmlock2nix.build {
-  src = ./.;
+  src = ./.; # mandatory
+  installPhase = "cp -r dist $out"; # mandatory
   # optionally:
   # npmCommands = [ "npm run build" ];
+  # symlink_node_modules = true, (default)
 }
 ```
 
