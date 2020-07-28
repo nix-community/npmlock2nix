@@ -109,7 +109,10 @@ rec {
       };
     };
 
-  shell = attrs:
+  shell =
+    { symlink_node_modules ? false
+    , ...
+    }@attrs:
     let
       nm = node_modules attrs;
     in
@@ -117,7 +120,16 @@ rec {
       buildInputs = [ nm.nodejs nm ];
       shellHook = ''
         export NODE_PATH="${nm}/node_modules:$NODE_PATH"
-      '';
+      '' + (lib.optionalString symlink_node_modules ''
+        if test -d node_modules; then
+          echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
+          exit 1
+        fi
+
+        # FIXME: we should somehow register a GC root here?
+        ln -sf ${nm}/node_modules node_modules
+      ''
+      );
       passthru.node_modules = nm;
     };
 

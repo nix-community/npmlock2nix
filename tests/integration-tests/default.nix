@@ -24,4 +24,44 @@ testLib.makeIntegrationTests {
     '';
     expected = "1.0.4\n";
   };
+
+  symlinkNodeModules =
+    let
+      shell = npmlock2nix.shell { src = ../examples-projects/bin-project; symlink_node_modules = true; };
+    in
+    {
+      description = ''
+        The shell builder supports linking the nix build node_modules folder into
+        the current working directory via the `shellHook`. Verify taht we are
+        indeed doing that.
+      '';
+      inherit shell;
+      command = ''
+        readlink -f node_modules
+      '';
+      expected = toString (shell.node_modules + "/node_modules\n");
+    };
+
+  symlinkNodeModulesDoesNotOverrideExistingNodeModules =
+    let
+      shell = npmlock2nix.shell { src = ../examples-projects/bin-project; symlink_node_modules = true; };
+    in
+    {
+      description = ''
+        Ensure the shellHook doesn't override node_modules directory.
+      '';
+      inherit shell;
+      setup-command = ''
+        mkdir node_modules
+      '';
+      command = ''
+        readlink -f node_modules
+      '';
+      status = 1;
+      expected = "";
+      expected-stderr = ''
+        [npmlock2nix] There is already a `node_modules` directory. Not replacing it.
+      '';
+    };
+
 }
