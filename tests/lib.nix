@@ -27,6 +27,7 @@
   # , shell
   # , command
   # , expected
+  # , (optional) expected-stderr
   # , (optional) status
   # , (optional) temporary-directory = true
   # , (optional) setup-command
@@ -60,6 +61,8 @@
           command = test.script;
           stdout = test.expected;
           exit-status = test.status or 0;
+        } // lib.optionalAttrs (test ? expected-stderr) {
+          stderr = test.expected-stderr;
         })
         (lib.attrValues testScripts);
 
