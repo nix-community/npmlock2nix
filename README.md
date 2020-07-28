@@ -60,3 +60,35 @@ npmlock2nix.node_modules {
 }
 ```
 
+# Contributing
+
+Please feel free to contribute to this repository. We try to take a tests-first
+approach to ensure everything works and continues to work as the project
+evolves.
+
+We recommend using [`direnv`](https://github.com/direnv/direnv) with this repository.
+
+## Running tests
+
+Simply running the `test.sh` in the root of the repository should be sufficient
+to run both unit- and integration-tests.
+
+Within the `nix-shell` environment (either via manually starting `nix-shell` or
+via `direnv`) you can execute the `watch-tests` command. It will continuously
+watch the existing files and rerun tests on any change.
+
+You can manually build the targets by invoking `nix-build -A tests` and
+`nix-build -A tests.integration-tests`. The Nix build of the integration tests
+just creates a test driver that executes them via
+[Smoke](https://github.com/SamirTalwar/smoke). The generated script is then run
+impurely as it targets `nix-shell` behaviour (which is hard to test from within
+a nix build).
+
+## Formatting
+
+We are using [`nixpkgs-fmt`](https://github.com/nix-community/nixpkgs-fmt) for
+Nix code formatting. While it isn't always the pretties code it is a format
+that we did settle on for consistency.
+
+When using the shell expression in this repository pre-commit hooks will be
+installed automatically that ensure all comitted code is properly formatted.

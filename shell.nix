@@ -1,8 +1,8 @@
 let
   pkgs = import ./nix { };
 
-  test-runner = pkgs.writeScriptBin "test-runner" ''
-    find . -type f | ${pkgs.entr}/bin/entr -c nix-build -A tests --show-trace
+  watch-tests = pkgs.writeScriptBin "watch-tests" ''
+    find . -type f | ${pkgs.entr}/bin/entr -c ./test.sh
   '';
 
   pre-commit-hooks = pkgs.nix-pre-commit-hooks.run {
@@ -14,6 +14,6 @@ let
 
 in
 pkgs.mkShell {
-  buildInputs = [ test-runner pkgs.nodejs pkgs.smoke pkgs.niv pkgs.nixpkgs-fmt ];
+  buildInputs = [ watch-tests pkgs.nodejs pkgs.smoke pkgs.niv pkgs.nixpkgs-fmt ];
   inherit (pre-commit-hooks) shellHook;
 }
