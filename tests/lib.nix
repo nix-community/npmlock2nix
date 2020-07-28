@@ -20,8 +20,17 @@
     if builtins.length failures == 0 then [ ] else
     builtins.throw msg;
 
-  # Takes an attribute set of tests { description, shell, command, expected, (optional) status, (optional) temporary-directory = true }
+  # Takes an attribute set of tests
   # an creates a bats script that executes them.
+  # Each tests set has this format:
+  # { description
+  # , shell
+  # , command
+  # , expected
+  # , (optional) status
+  # , (optional) temporary-directory = true
+  # , (optional) setup-command
+  # }
   makeIntegrationTests = tests:
     let
       mkTestScript = name: test:
@@ -40,6 +49,7 @@
             trap cleanup EXIT
             cd $WORKING_DIR
           ''}
+          ${lib.optionalString (test ? setup-command) test.setup-command}
           nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" test.command}"
         '';
       testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test; inherit name; }) tests;
