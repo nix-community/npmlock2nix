@@ -12,15 +12,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "smoke": {
-        "branch": "master",
+        "branch": "main",
         "description": "Runs tests against anything, using command-line arguments, STDIN, STDOUT and STDERR.",
         "homepage": "",
         "owner": "SamirTalwar",
         "repo": "smoke",
-        "rev": "a80cba28744e93b9b0564a1155deb504ea650114",
-        "sha256": "10b09z1ay7adr2bar2xv8ph13j8gvz7xm5rkhclgqk7d2ccc0j1n",
+        "rev": "a7e57e662966f2d6534d30b76aa752a8da75c2f6",
+        "sha256": "0c0l4mpw0yckg1qnajmyr3h85d8zzp6123xcjg0bny8vpwczsgzl",
         "type": "tarball",
-        "url": "https://github.com/SamirTalwar/smoke/archive/a80cba28744e93b9b0564a1155deb504ea650114.tar.gz",
+        "url": "https://github.com/SamirTalwar/smoke/archive/a7e57e662966f2d6534d30b76aa752a8da75c2f6.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
