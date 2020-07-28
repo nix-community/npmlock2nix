@@ -2,7 +2,7 @@
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
-    shell = npmlock2nix.shell { src = ../examples-projects/single-dependency; };
+    shell = npmlock2nix.shell { src = ../examples-projects/single-dependency; symlink_node_modules = false; };
     command = ''
       node -e 'console.log(require("leftpad")(123, 7));'
     '';
@@ -18,7 +18,7 @@ testLib.makeIntegrationTests {
   };
   pathContainsNodeApplications = {
     description = "Applications from the node_modules/.bin folder should be available on $PATH in the shell expression";
-    shell = npmlock2nix.shell { src = ../examples-projects/bin-project; };
+    shell = npmlock2nix.shell { src = ../examples-projects/bin-project; symlink_node_modules = false; };
     command = ''
       mkdirp --version
     '';
@@ -68,7 +68,10 @@ testLib.makeIntegrationTests {
     description = ''
       We should be able to invoke the webpack(-cli) to build a very simple bootstrap based project
     '';
-    shell = npmlock2nix.shell { src = ../examples-projects/webpack-cli-project; };
+    shell = npmlock2nix.shell {
+      src = ../examples-projects/webpack-cli-project;
+      symlink_node_modules = true;
+    };
     setup-command = ''
       cp --no-preserve=mode -r ${testLib.withoutNodeModules ../examples-projects/webpack-cli-project} workspace
       cd workspace

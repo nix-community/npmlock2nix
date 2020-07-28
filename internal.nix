@@ -114,7 +114,7 @@ rec {
     };
 
   shell =
-    { symlink_node_modules ? false
+    { symlink_node_modules ? true
     , ...
     }@attrs:
     let

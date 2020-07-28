@@ -21,6 +21,7 @@ Put the following in your `shell.nix`:
 npmlock2nix.shell {
   src = ./.;
   nodejs = pkgs.nodejs-14_x;
+  # symlink_node_modules = true, (default)
 }
 ```
 

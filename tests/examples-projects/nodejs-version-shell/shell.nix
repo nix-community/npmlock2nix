@@ -9,4 +9,5 @@ assert pkgs.nodejs == node -> throw "`nodejs` is refering to `nodejs-10_x` rende
 pkgs.npmlock2nix.shell {
   src = ./.;
   nodejs = node;
+  symlink_node_modules = false;
 }
