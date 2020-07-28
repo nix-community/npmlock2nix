@@ -64,4 +64,22 @@ testLib.makeIntegrationTests {
       '';
     };
 
+
+  webpackCli = {
+    description = ''
+      We should be able to invoke the webpack-cli
+    '';
+    shell = npmlock2nix.shell { src = ../examples-projects/webpack-cli-project; };
+    setup-command = ''
+      cp --no-preserve=mode -r ${../examples-projects/webpack-cli-project/src} src
+    '';
+    command = ''
+      webpack-cli --version
+      webpack --mode production > /dev/null
+      test -e dist/main.js
+    '';
+    expected = ''
+      3.3.12
+    '';
+  };
 }
