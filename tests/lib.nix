@@ -20,18 +20,40 @@
     if builtins.length failures == 0 then [ ] else
     builtins.throw msg;
 
-  # Takes an attribute set of tests { description, shell, command, expected, (optional) status }
+  # Takes an attribute set of tests
   # an creates a bats script that executes them.
+  # Each tests set has this format:
+  # { description
+  # , shell
+  # , command
+  # , expected
+  # , (optional) expected-stderr
+  # , (optional) status
+  # , (optional) temporary-directory = true
+  # , (optional) setup-command
+  # }
   makeIntegrationTests = tests:
     let
-      mkTestScript = name: shell: command:
+      mkTestScript = name: test:
         let
-          shellDrv = (shell.overrideAttrs (_: { phases = [ "noopPhase" ]; noopPhase = "touch $out"; })).drvPath; in
+          shellDrv = (test.shell.overrideAttrs (_: { phases = [ "noopPhase" ]; noopPhase = "touch $out"; })).drvPath;
+          temporaryDirectory = test.temporary-directory or true;
+        in
         writeShellScript name ''
           export PATH="${nix}/bin:${coreutils}/bin"
-          exec nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" command}"
+          set -e
+          ${lib.optionalString temporaryDirectory ''
+            WORKING_DIR=$(mktemp -d)
+            function cleanup {
+              rm -rf "$WORKING_DIR"
+            }
+            trap cleanup EXIT
+            cd $WORKING_DIR
+          ''}
+          ${lib.optionalString (test ? setup-command) test.setup-command}
+          nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" test.command}"
         '';
-      testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test.shell test.command; inherit name; }) tests;
+      testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test; inherit name; }) tests;
 
       smokeConfig.tests = map
         (test: {
@@ -39,6 +61,8 @@
           command = test.script;
           stdout = test.expected;
           exit-status = test.status or 0;
+        } // lib.optionalAttrs (test ? expected-stderr) {
+          stderr = test.expected-stderr;
         })
         (lib.attrValues testScripts);
 
