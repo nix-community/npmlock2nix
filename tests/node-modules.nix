@@ -65,4 +65,16 @@ testLib.runTests {
     expected = "our-custom-nodejs-package";
   };
 
+  testNodeModulesPropagatesNodejs =
+    let
+      drv = npmlock2nix.node_modules {
+        src = ./examples-projects/no-dependencies;
+        nodejs = nodejs;
+      };
+    in
+    {
+      expr = drv.propagatedBuildInputs;
+      expected = [ nodejs ];
+    };
+
 }

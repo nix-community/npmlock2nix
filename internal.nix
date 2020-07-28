@@ -83,6 +83,10 @@ rec {
         nodejs
       ];
 
+      propagatedBuildInputs = [
+        nodejs
+      ];
+
       preConfigure = ''
         export HOME=$(mktemp -d)
       '';
