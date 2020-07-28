@@ -76,8 +76,14 @@ testLib.makeIntegrationTests {
     command = ''
       webpack-cli --version
       webpack --mode production > /dev/null
-      test -e dist/main.js
-      test -e dist/index.html
+      if ! test -e dist/main.js; then
+        echo "dist/main.js missing"
+        exit 1
+      fi
+      if ! test -e dist/index.html; then
+        echo "dist/index.html missing"
+        exit 1
+      fi
     '';
     expected = ''
       3.3.12
