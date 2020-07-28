@@ -12,6 +12,5 @@ jobs:
         with:
           name: npmlock2nix
           signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
-      - run: |
-          nix-shell --run "nixpkgs-fmt --check ."
-          ./test.sh
+      - run: nix-shell --run "nixpkgs-fmt --check ."
+      - run: ./test.sh
