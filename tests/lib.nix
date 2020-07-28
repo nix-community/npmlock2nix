@@ -76,4 +76,8 @@
       exec ${smoke}/bin/smoke ${testScriptDir}
     '';
 
+  withoutNodeModules = src: lib.cleanSourceWith {
+    filter = name: type: ! (type == "directory" && name == "node_modules");
+    inherit src;
+  };
 }

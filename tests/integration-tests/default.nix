@@ -64,19 +64,20 @@ testLib.makeIntegrationTests {
       '';
     };
 
-
   webpackCli = {
     description = ''
-      We should be able to invoke the webpack-cli
+      We should be able to invoke the webpack(-cli) to build a very simple bootstrap based project
     '';
     shell = npmlock2nix.shell { src = ../examples-projects/webpack-cli-project; };
     setup-command = ''
-      cp --no-preserve=mode -r ${../examples-projects/webpack-cli-project/src} src
+      cp --no-preserve=mode -r ${testLib.withoutNodeModules ../examples-projects/webpack-cli-project} workspace
+      cd workspace
     '';
     command = ''
       webpack-cli --version
       webpack --mode production > /dev/null
       test -e dist/main.js
+      test -e dist/index.html
     '';
     expected = ''
       3.3.12
