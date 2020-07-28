@@ -1,4 +1,16 @@
 {
+    "nix-pre-commit-hooks": {
+        "branch": "master",
+        "description": "Seamless integration of https://pre-commit.com git hooks with Nix.",
+        "homepage": "",
+        "owner": "cachix",
+        "repo": "pre-commit-hooks.nix",
+        "rev": "783f1967eeee169fb7e58b29f8918036ff7c0936",
+        "sha256": "12nbpyvbi05b20869djp9rxjvw78gh6ys19vkysrrw4a8akw92l8",
+        "type": "tarball",
+        "url": "https://github.com/cachix/pre-commit-hooks.nix/archive/783f1967eeee169fb7e58b29f8918036ff7c0936.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "nixpkgs": {
         "branch": "nixos-unstable",
         "description": "A read-only mirror of NixOS/nixpkgs tracking the released channels. Send issues and PRs to",
