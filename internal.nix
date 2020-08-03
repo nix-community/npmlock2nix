@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, runCommand }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand }:
 rec {
   default_nodejs = nodejs;
 
@@ -81,6 +81,17 @@ rec {
     }@args:
     let
       lockfile = readLockfile packageLockJson;
+
+      preinstall_node_modules = writeTextFile {
+        name = "preinstall";
+        destination = "/node_modules/.hooks/preinstall";
+        text = ''
+          #! ${stdenv.shell}
+          source $stdenv/setup
+          patchShebangs .
+        '';
+        executable = true;
+      };
     in
     stdenv.mkDerivation {
       inherit (lockfile) version;
@@ -109,7 +120,9 @@ rec {
 
       buildPhase = ''
         runHook preBuild
-        npm ci --offline --nodedir=${nodeSource nodejs}
+        mkdir -p node_modules/.hooks
+        ln -s ${preinstall_node_modules}/node_modules/.hooks/preinstall node_modules/.hooks/preinstall
+        npm install --offline --nodedir=${nodeSource nodejs}
         runHook postBuild
       '';
       installPhase = ''
