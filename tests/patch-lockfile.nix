@@ -77,8 +77,8 @@ testLib.runTests {
   };
 
   testPatchedLockFile = {
-    expr = toString (npmlock2nix.internal.patchedLockfile ./examples-projects/nested-dependencies/package-lock.json);
-    expected = "/nix/store/b0iqhx5kaa20qm4ra7j4wr5ggmlkhbn0-packages-lock.json";
+    expr = testLib.hashFile (npmlock2nix.internal.patchedLockfile ./examples-projects/nested-dependencies/package-lock.json);
+    expected = "980323c3a53d86ab6886f21882936cfe7c06ac633993f16431d79e3185084414";
   };
 
 }

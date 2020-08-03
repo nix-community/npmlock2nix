@@ -5,6 +5,9 @@
 , smoke
 , coreutils
 }: {
+  # Reads a given file (either drv, path or string) and returns it's sha256 hash
+  hashFile = filename: builtins.hashString "sha256" (builtins.readFile filename);
+
   runTests = tests:
     let
       failures = lib.debug.runTests tests;
