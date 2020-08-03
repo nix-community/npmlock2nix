@@ -21,7 +21,7 @@
     builtins.throw msg;
 
   # Takes an attribute set of tests
-  # an creates a bats script that executes them.
+  # an creates a smoke file that executes them.
   # Each tests set has this format:
   # { description
   # , shell
