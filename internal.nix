@@ -69,6 +69,8 @@ rec {
     , buildInputs ? [ ]
     , nativeBuildInputs ? [ ]
     , nodejs ? default_nodejs
+    , preBuild ? ""
+    , postBuild ? ""
     , ...
     }@args:
     let
@@ -77,7 +79,7 @@ rec {
     stdenv.mkDerivation {
       inherit (lockfile) version;
       pname = lockfile.name;
-      inherit src buildInputs;
+      inherit src buildInputs preBuild postBuild;
 
       nativeBuildInputs = nativeBuildInputs ++ [
         nodejs
@@ -96,7 +98,9 @@ rec {
       '';
 
       buildPhase = ''
+        runHook preBuild
         npm ci --offline
+        runHook postBuild
       '';
       installPhase = ''
         mkdir $out

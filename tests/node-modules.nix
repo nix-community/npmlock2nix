@@ -77,4 +77,22 @@ testLib.runTests {
       expected = [ nodejs ];
     };
 
+  testHonorsPrePostBuildHook =
+    let
+      drv = npmlock2nix.node_modules {
+        src = ./examples-projects/single-dependency;
+        preBuild = ''
+          echo -n "preBuild" > preBuild-test
+        '';
+        postBuild = ''
+          echo -n "postBuild" > postBuild-test
+          mv *Build-test node_modules
+        '';
+      };
+    in
+    {
+      expr = builtins.readFile (drv + "/node_modules/preBuild-test") + builtins.readFile (drv + "/node_modules/postBuild-test");
+      expected = "preBuildpostBuild";
+    };
+
 }
