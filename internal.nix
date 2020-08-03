@@ -95,6 +95,10 @@ rec {
         nodejs
       ];
 
+      setupHooks = [
+        ./set-node-path.sh
+      ];
+
       preConfigure = ''
         export HOME=$(mktemp -d)
       '';
