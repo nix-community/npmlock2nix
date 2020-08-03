@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, runCommand }:
 rec {
   default_nodejs = nodejs;
 
@@ -62,6 +62,12 @@ rec {
   # Type: Path -> Derivation
   patchedLockfile = file: writeText "packages-lock.json" (builtins.toJSON (patchLockfile file));
 
+  # Prepared source for npm installation
+  nodeSource = nodes: runCommand "node-sources-${nodejs.version}" {} ''
+    tar --no-same-owner --no-same-permissions -xf ${nodejs.src}
+    mv node-* $out
+  '';
+
   node_modules =
     { src
     , packageJson ? src + "/package.json"
@@ -99,7 +105,7 @@ rec {
 
       buildPhase = ''
         runHook preBuild
-        npm ci --offline
+        npm ci --offline --nodedir=${nodeSource nodejs}
         runHook postBuild
       '';
       installPhase = ''
