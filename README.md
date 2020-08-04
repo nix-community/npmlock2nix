@@ -21,7 +21,7 @@ Put the following in your `shell.nix`:
 npmlock2nix.shell {
   src = ./.;
   nodejs = pkgs.nodejs-14_x;
-  # symlink_node_modules = true, (default)
+  # node_modules_mode = "symlink", (default; or "copy")
   # You can override attributes passed to `node_modules` by setting
   # `node_modules_attrs` like below.
   # A few attributes (such as `nodejs` and `src`) are always inherited from the
@@ -46,7 +46,7 @@ npmlock2nix.build {
   installPhase = "cp -r dist $out"; # mandatory
   # optionally:
   # buildCommands = [ "npm run build" ];
-  # symlink_node_modules = true, (default)
+  # node_modules_mode = "symlink", (default; or "copy")
   # You can override attributes passed to `node_modules` by setting
   # `node_modules_attrs` like below.
   # A few attributes (such as `nodejs` and `src`) are always inherited from the

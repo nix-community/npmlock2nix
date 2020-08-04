@@ -2,7 +2,7 @@
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
-    shell = npmlock2nix.shell { src = ../examples-projects/single-dependency; symlink_node_modules = false; };
+    shell = npmlock2nix.shell { src = ../examples-projects/single-dependency; };
     command = ''
       node -e 'console.log(require("leftpad")(123, 7));'
     '';
@@ -18,7 +18,7 @@ testLib.makeIntegrationTests {
   };
   pathContainsNodeApplications = {
     description = "Applications from the node_modules/.bin folder should be available on $PATH in the shell expression";
-    shell = npmlock2nix.shell { src = ../examples-projects/bin-project; symlink_node_modules = false; };
+    shell = npmlock2nix.shell { src = ../examples-projects/bin-project; };
     command = ''
       mkdirp --version
     '';
@@ -27,7 +27,10 @@ testLib.makeIntegrationTests {
 
   symlinkNodeModules =
     let
-      shell = npmlock2nix.shell { src = ../examples-projects/bin-project; symlink_node_modules = true; };
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "symlink";
+      };
     in
     {
       description = ''
@@ -44,7 +47,10 @@ testLib.makeIntegrationTests {
 
   symlinkNodeModulesDoesNotOverrideExistingNodeModules =
     let
-      shell = npmlock2nix.shell { src = ../examples-projects/bin-project; symlink_node_modules = true; };
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "symlink";
+      };
     in
     {
       description = ''
@@ -64,13 +70,74 @@ testLib.makeIntegrationTests {
       '';
     };
 
+  copyNodeModulesDoesNotOverrideExistingNodeModules =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "copy";
+      };
+    in
+    {
+      description = ''
+        Ensure the shellHook doesn't override node_modules directory.
+      '';
+      inherit shell;
+      setup-command = ''
+        mkdir node_modules
+      '';
+      command = ''
+        readlink -f node_modules
+      '';
+      status = 1;
+      expected = "";
+      expected-stderr = ''
+        [npmlock2nix] There is already a `node_modules` directory. Not replacing it.
+      '';
+    };
+
+  symlinkNodeModulesCreatesALink =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "symlink";
+      };
+    in
+    {
+      description = ''
+        Ensure the shellHook does create a symlink.
+      '';
+      inherit shell;
+      command = ''
+        test -L node_modules || exit 1
+      '';
+      expected = "";
+    };
+
+  copyNodeModulesCreatesANewDirectory =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "copy";
+      };
+    in
+    {
+      description = ''
+        Ensure the shellHook does create a directory.
+      '';
+      inherit shell;
+      command = ''
+        test -d node_modules || exit 1
+      '';
+      expected = "";
+    };
+
+
   webpackCli = {
     description = ''
       We should be able to invoke the webpack(-cli) to build a very simple bootstrap based project
     '';
     shell = npmlock2nix.shell {
       src = ../examples-projects/webpack-cli-project;
-      symlink_node_modules = true;
     };
     setup-command = ''
       cp --no-preserve=mode -r ${testLib.withoutNodeModules ../examples-projects/webpack-cli-project} workspace

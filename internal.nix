@@ -70,6 +70,24 @@ rec {
     mv node-* $out
   '';
 
+  add_node_modules_to_cwd = node_modules: mode:
+    ''
+      if test -e node_modules; then
+        echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
+        exit 1
+      fi
+    '' +
+    (
+      if mode == "copy" then ''
+        cp --no-preserve=mode -r ${node_modules}/node_modules node_modules
+        chmod -R u+rw node_modules
+      '' else if mode == "symlink" then ''
+        ln -s ${node_modules}/node_modules node_modules
+      '' else throw "[npmlock2nix] node_modules_mode must be either `copy` or `symlink`"
+    ) + ''
+      export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
+    '';
+
   # Extract the attributes that are relevant for building node_modules and use
   # them as defaults in case the node_modules_attrs attribute doesn't have
   # them.
@@ -93,93 +111,93 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , ...
     }@args:
-    assert (builtins.typeOf preInstallLinks != "set") -> throw "`preInstallLinks` must be an attributeset of attributesets";
-    let
-      lockfile = readLockfile packageLockJson;
+      assert (builtins.typeOf preInstallLinks != "set") -> throw "`preInstallLinks` must be an attributeset of attributesets";
+      let
+        lockfile = readLockfile packageLockJson;
 
-      preinstall_node_modules = writeTextFile {
-        name = "prepare";
-        destination = "/node_modules/.hooks/prepare";
-        text = ''
-          #! ${stdenv.shell}
+        preinstall_node_modules = writeTextFile {
+          name = "prepare";
+          destination = "/node_modules/.hooks/prepare";
+          text = ''
+            #! ${stdenv.shell}
 
-          ${lib.concatStringsSep "\n" (
-            lib.mapAttrsToList (name: mappings: ''
-                if [ "$npm_package_name" == "${name}" ]; then
-                ${lib.concatStringsSep "\n"
-                  (lib.mapAttrsToList (to: from: ''
-                        dirname=$(dirname ${to})
-                        mkdir -p $dirname
-                        ln -s ${from} ${to}
-                      '') mappings
-                  )}
-                fi
-              '') preInstallLinks
-            )}
+            ${lib.concatStringsSep "\n" (
+              lib.mapAttrsToList (name: mappings: ''
+                  if [ "$npm_package_name" == "${name}" ]; then
+                  ${lib.concatStringsSep "\n"
+                    (lib.mapAttrsToList (to: from: ''
+                          dirname=$(dirname ${to})
+                          mkdir -p $dirname
+                          ln -s ${from} ${to}
+                        '') mappings
+                    )}
+                  fi
+                '') preInstallLinks
+              )}
 
-          if grep -I -q -r '/bin/' .; then
-            source $stdenv/setup
-            patchShebangs .
-          fi
+            if grep -I -q -r '/bin/' .; then
+              source $stdenv/setup
+              patchShebangs .
+            fi
 
+          '';
+          executable = true;
+        };
+      in
+      stdenv.mkDerivation {
+        inherit (lockfile) version;
+        pname = lockfile.name;
+        inherit src buildInputs preBuild postBuild;
+
+        nativeBuildInputs = nativeBuildInputs ++ [
+          nodejs
+        ];
+
+        propagatedBuildInputs = [
+          nodejs
+        ];
+
+        setupHooks = [
+          ./set-node-path.sh
+        ];
+
+        preConfigure = ''
+          export HOME=$(mktemp -d)
         '';
-        executable = true;
-      };
-    in
-    stdenv.mkDerivation {
-      inherit (lockfile) version;
-      pname = lockfile.name;
-      inherit src buildInputs preBuild postBuild;
 
-      nativeBuildInputs = nativeBuildInputs ++ [
-        nodejs
-      ];
+        postPatch = ''
+          ln -sf ${patchedLockfile packageLockJson} package-lock.json
+        '';
 
-      propagatedBuildInputs = [
-        nodejs
-      ];
+        buildPhase = ''
+          runHook preBuild
+          mkdir -p node_modules/.hooks
+          ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
+          npm install --offline --nodedir=${nodeSource nodejs}
+          test -d node_modules/.bin && patchShebangs node_modules/.bin
+          rm -rf node_modules/.hooks
+          runHook postBuild
+        '';
+        installPhase = ''
+          mkdir $out
 
-      setupHooks = [
-        ./set-node-path.sh
-      ];
-
-      preConfigure = ''
-        export HOME=$(mktemp -d)
-      '';
-
-      postPatch = ''
-        ln -sf ${patchedLockfile packageLockJson} package-lock.json
-      '';
-
-      buildPhase = ''
-        runHook preBuild
-        mkdir -p node_modules/.hooks
-        ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
-        npm install --offline --nodedir=${nodeSource nodejs}
-        test -d node_modules/.bin && patchShebangs node_modules/.bin
-        rm -rf node_modules/.hooks
-        runHook postBuild
-      '';
-      installPhase = ''
-        mkdir $out
-
-        if test -d node_modules; then
-          if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
-            mv node_modules $out/
-            if test -d $out/node_modules/.bin; then
-              ln -s $out/node_modules/.bin $out/bin
+          if test -d node_modules; then
+            if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
+              mv node_modules $out/
+              if test -d $out/node_modules/.bin; then
+                ln -s $out/node_modules/.bin $out/bin
+              fi
             fi
           fi
-        fi
-      '';
+        '';
 
-      passthru = {
-        inherit nodejs;
+        passthru = {
+          inherit nodejs;
+        };
       };
-    };
 
   shell =
-    { symlink_node_modules ? true
+    { node_modules_mode ? "symlink"
     , ...
     }@attrs:
     let
@@ -189,17 +207,9 @@ rec {
     mkShell ({
       buildInputs = [ nm.nodejs nm ];
       shellHook = ''
-        export NODE_PATH="${nm}/node_modules:$NODE_PATH"
-      '' + (lib.optionalString symlink_node_modules ''
-        if test -d node_modules; then
-          echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
-          exit 1
-        fi
-
-        # FIXME: we should somehow register a GC root here?
-        ln -sf ${nm}/node_modules node_modules
-      ''
-      );
+        # FIXME: we should somehow register a GC root here in case of a symlink?
+        ${add_node_modules_to_cwd nm node_modules_mode}
+      '';
       passthru.node_modules = nm;
     } // extraAttrs);
 
@@ -207,8 +217,7 @@ rec {
     { src
     , buildCommands ? [ "npm run build" ]
     , installPhase
-    , symlink_node_modules ? true
-    , copy_node_modules ? false
+    , node_modules_mode ? "symlink"
     , buildInputs ? [ ]
     , ...
     }@attrs:
@@ -222,15 +231,7 @@ rec {
       buildInputs = [ nm ] ++ buildInputs;
       inherit src installPhase;
 
-      postUnpack =
-        if !copy_node_modules && symlink_node_modules then ''
-          ln -sf ${nm}/node_modules node_modules
-          export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
-        '' else if copy_node_modules then ''
-          cp -r ${nm}/node_modules node_modules
-          chmod -R u+rw node_modules
-          export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
-        '' else "";
+      preConfigure = add_node_modules_to_cwd nm node_modules_mode;
 
       buildPhase = ''
         runHook preBuild
