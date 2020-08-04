@@ -62,7 +62,8 @@ rec {
   # Type: Path -> Derivation
   patchedLockfile = file: writeText "packages-lock.json" (builtins.toJSON (patchLockfile file));
 
-  # Prepared source for npm installation
+  # Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
+  # Type: Derivation -> Derivation
   nodeSource = nodes: runCommand "node-sources-${nodejs.version}"
     { } ''
     tar --no-same-owner --no-same-permissions -xf ${nodejs.src}
