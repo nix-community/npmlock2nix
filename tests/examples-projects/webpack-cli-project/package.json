@@ -4,6 +4,9 @@
   "description": "",
   "license": "ISC",
   "main": "index.js",
+  "scripts": {
+    "build": "webpack --mode=production"
+  },
   "dependencies": {
     "bootstrap": "^4.5.0",
     "html-webpack-plugin": "^4.3.0",

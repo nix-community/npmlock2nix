@@ -45,7 +45,7 @@ npmlock2nix.build {
   src = ./.; # mandatory
   installPhase = "cp -r dist $out"; # mandatory
   # optionally:
-  # npmCommands = [ "npm run build" ];
+  # buildCommands = [ "npm run build" ];
   # symlink_node_modules = true, (default)
   # You can override attributes passed to `node_modules` by setting
   # `node_modules_attrs` like below.

@@ -204,7 +204,7 @@ rec {
 
   build =
     { src
-    , npmCommands
+    , buildCommands ? [ "npm run build" ]
     , installPhase
     , symlink_node_modules ? true
     , copy_node_modules ? false
@@ -233,7 +233,7 @@ rec {
 
       buildPhase = ''
         runHook preBuild
-        ${lib.concatStringsSep "\n" npmCommands}
+        ${lib.concatStringsSep "\n" buildCommands}
         runHook postBuild
       '';
     } // extraAttrs);

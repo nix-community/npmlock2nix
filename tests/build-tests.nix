@@ -13,11 +13,19 @@ let
     );
 in
 symlinkAttrs {
-  webpack-cli-project = npmlock2nix.build {
+  webpack-cli-project-default-build-command = npmlock2nix.build {
     src = ./examples-projects/webpack-cli-project;
-    npmCommands = [ "webpack --mode=production" ];
     installPhase = ''
       cp -r dist $out
     '';
   };
+
+  webpack-cli-project-custom-build-command = npmlock2nix.build {
+    src = ./examples-projects/webpack-cli-project;
+    buildCommands = [ "webpack --mode=production" ];
+    installPhase = ''
+      cp -r dist $out
+    '';
+  };
+
 }
