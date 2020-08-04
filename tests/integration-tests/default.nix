@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib }:
+{ npmlock2nix, testLib, callPackage, libwebp }:
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
@@ -93,6 +93,31 @@ testLib.makeIntegrationTests {
     '';
     expected = ''
       3.3.12
+    '';
+  };
+
+  bin-wrapped-dep = {
+    description = ''
+      Some packages try to download files into their source folder when they
+      are missing.
+      One of these packages is `cwebp-bin` that is based on the `bin-wrapper`
+      package. The common pattern here is that they check for their binary (in
+      this case `cwebp`) in the `vendor` directory of the package in the
+      node_modules folder.
+
+      In this test we are verifying that those node projects can be built and
+      the binaries are availble during runtime (through node).
+
+      We expect the path returned by nodejs to be a symlink to the actual store path.
+    '';
+
+    shell = callPackage ../examples-projects/bin-wrapped-dep/shell.nix { };
+    command = ''
+      readlink -f $(node -e 'console.log(require("cwebp-bin"))')
+    '';
+
+    expected = ''
+      ${libwebp}/bin/cwebp
     '';
   };
 }
