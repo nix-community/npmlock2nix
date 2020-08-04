@@ -63,7 +63,8 @@ rec {
   patchedLockfile = file: writeText "packages-lock.json" (builtins.toJSON (patchLockfile file));
 
   # Prepared source for npm installation
-  nodeSource = nodes: runCommand "node-sources-${nodejs.version}" {} ''
+  nodeSource = nodes: runCommand "node-sources-${nodejs.version}"
+    { } ''
     tar --no-same-owner --no-same-permissions -xf ${nodejs.src}
     mv node-* $out
   '';
@@ -77,18 +78,37 @@ rec {
     , nodejs ? default_nodejs
     , preBuild ? ""
     , postBuild ? ""
+    , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , ...
     }@args:
     let
       lockfile = readLockfile packageLockJson;
 
       preinstall_node_modules = writeTextFile {
-        name = "preinstall";
-        destination = "/node_modules/.hooks/preinstall";
+        name = "prepare";
+        destination = "/node_modules/.hooks/prepare";
         text = ''
           #! ${stdenv.shell}
-          source $stdenv/setup
-          patchShebangs .
+
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (name: mappings: ''
+                if [ "$npm_package_name" == "${name}" ]; then
+                ${lib.concatStringsSep "\n"
+                  (lib.mapAttrsToList (to: from: ''
+                        dirname=$(dirname ${to})
+                        mkdir -p $dirname
+                        ln -s ${from} ${to}
+                      '') mappings
+                  )}
+                fi
+              '') preInstallLinks
+            )}
+
+          if grep -I -q -r '/bin/' .; then
+            source $stdenv/setup
+            patchShebangs .
+          fi
+
         '';
         executable = true;
       };
@@ -121,16 +141,21 @@ rec {
       buildPhase = ''
         runHook preBuild
         mkdir -p node_modules/.hooks
-        ln -s ${preinstall_node_modules}/node_modules/.hooks/preinstall node_modules/.hooks/preinstall
+        ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
         npm install --offline --nodedir=${nodeSource nodejs}
+        test -d node_modules/.bin && patchShebangs node_modules/.bin
+        rm -rf node_modules/.hooks
         runHook postBuild
       '';
       installPhase = ''
         mkdir $out
+
         if test -d node_modules; then
-          mv node_modules $out/
-          if test -d $out/node_modules/.bin; then
-            ln -s $out/node_modules/.bin $out/bin
+          if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
+            mv node_modules $out/
+            if test -d $out/node_modules/.bin; then
+              ln -s $out/node_modules/.bin $out/bin
+            fi
           fi
         fi
       '';
@@ -169,19 +194,27 @@ rec {
     , npmCommands
     , installPhase
     , symlink_node_modules ? true
+    , copy_node_modules ? false
+    , buildBuildInputs ? [ ]
     , ...
     }@attrs:
     let
-      nm = node_modules attrs;
+      nm = node_modules (builtins.removeAttrs attrs [ "buildBuildInputs" "copy_node_modules" "npmCommands" "installPhase" ]);
     in
     stdenv.mkDerivation {
       pname = nm.pname;
       version = nm.version;
-      buildInputs = [ nm ];
+      buildInputs = [ nm ] ++ buildBuildInputs;
 
-      postUnpack = ''
-        ln -sf ${nm}/node_modules node_modules
-      '';
+      postUnpack =
+        if !copy_node_modules && symlink_node_modules then ''
+          ln -sf ${nm}/node_modules node_modules
+          export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
+        '' else if copy_node_modules then ''
+          cp -r ${nm}/node_modules node_modules
+          chmod -R u+rw node_modules
+          export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
+        '' else "";
 
       buildPhase = ''
         runHook preBuild
