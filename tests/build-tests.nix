@@ -1,4 +1,4 @@
-{ lib, symlinkJoin, npmlock2nix, runCommand }:
+{ lib, symlinkJoin, npmlock2nix, runCommand, libwebp }:
 let
   symlinkAttrs = attrs: runCommand "symlink-attrs"
     { }
@@ -26,6 +26,30 @@ symlinkAttrs {
     installPhase = ''
       cp -r dist $out
     '';
+  };
+
+  node-modules-attributes-are-passed-through = npmlock2nix.build {
+    src = ./examples-projects/bin-wrapped-dep;
+    buildCommands = [
+      ''
+        readlink -f $(node -e "console.log(require('cwebp-bin'))") > actual
+        echo ${libwebp}/bin/cwebp > expected
+      ''
+    ];
+    installPhase = ''
+      cp actual $out
+    '';
+
+    doCheck = true;
+    checkPhase = ''
+      cmp actual expected || exit 1
+    '';
+
+    node_modules_attrs = {
+      preInstallLinks = {
+        "cwebp-bin"."vendor/cwebp" = "${libwebp}/bin/cwebp";
+      };
+    };
   };
 
 }

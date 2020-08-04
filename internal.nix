@@ -93,6 +93,7 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , ...
     }@args:
+    assert (builtins.typeOf preInstallLinks != "set") -> throw "`preInstallLinks` must be an attributeset of attributesets";
     let
       lockfile = readLockfile packageLockJson;
 

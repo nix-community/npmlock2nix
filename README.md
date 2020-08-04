@@ -74,6 +74,16 @@ rebuilding the project (with the same dependencies) quicker.
 { pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
 npmlock2nix.node_modules {
   src = ./.;
+  # buildInputs = [ … ];
+
+  # You can symlink files into the directory of a specific dependency using the
+  # preInstallLinks attribute. Below you see how you can create a link to the
+  # cwebp binary at `node_modules/cwebp-bin/cwebp`.
+  # preInstallLinks = {
+  #   "cwebp-bin" = {
+  #       "vendor/cweb-bin" = "${pkgs.libwebp}/bin/cwebp"
+  #   };
+  # };
 }
 ```
 

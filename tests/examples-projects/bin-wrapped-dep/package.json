@@ -9,6 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cwebp-bin": "^6.1.1"
+    "cwebp-bin": "5.1.0"
   }
 }
