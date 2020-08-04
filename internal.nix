@@ -5,8 +5,8 @@ rec {
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
   makeSourceAttrs = name: dependency:
-    assert !(dependency ? resolved) -> builtins.throw "Missing `resolved` attribute for dependency `${name}`.";
-    assert !(dependency ? integrity) -> builtins.throw "Missing `integrity` attribute for dependency `${name}`.";
+    assert !(dependency ? resolved) -> throw "[npmlock2nix] Missing `resolved` attribute for dependency `${name}`.";
+    assert !(dependency ? integrity) -> throw "[npmlock2nix] Missing `integrity` attribute for dependency `${name}`.";
     {
       url = dependency.resolved;
       # FIXME: for backwards compatibility we should probably set the
@@ -18,8 +18,8 @@ rec {
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
   # Type: String -> Set -> Derivation
   makeSource = name: dependency:
-    assert (builtins.typeOf name != "string") -> builtins.throw "Name of dependency ${toString name} must be a string";
-    assert (builtins.typeOf dependency != "set") -> builtins.throw "Specification of dependency ${toString name} must be a set";
+    assert (builtins.typeOf name != "string") -> throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
+    assert (builtins.typeOf dependency != "set") -> throw "[npmlock2nix] Specification of dependency ${toString name} must be a set";
     fetchurl (makeSourceAttrs name dependency);
 
   # Description: Parses the lock file as json and returns an attribute set
@@ -29,7 +29,7 @@ rec {
       content = builtins.readFile file;
       json = builtins.fromJSON content;
     in
-    assert builtins.typeOf json != "set" -> throw "The NPM lockfile must be a valid JSON object";
+    assert builtins.typeOf json != "set" -> throw "[npmlock2nix] The NPM lockfile must be a valid JSON object";
     # if a lockfile doesn't declare dependencies ensure that we have an empty
     # set. This makes the consuming code eaiser.
     if json ? dependencies then json else json // { dependencies = { }; };
@@ -38,8 +38,8 @@ rec {
   # Description: Patches a single dependency (recursively) by replacing the resolved URL with a store path
   # Type: String -> Set -> Set
   patchDependency = name: spec:
-    assert (builtins.typeOf name != "string") -> builtins.throw "Name of dependency ${toString name} must be a string";
-    assert (builtins.typeOf spec != "set") -> builtins.throw "Spec of dependency ${toString name} must be a set";
+    assert (builtins.typeOf name != "string") -> throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
+    assert (builtins.typeOf spec != "set") -> throw "[npmlock2nix] pec of dependency ${toString name} must be a set";
     let
       isBundled = spec ? bundled && spec.bundled == true;
     in
@@ -55,7 +55,7 @@ rec {
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Path -> Set
   patchLockfile = file:
-    assert (builtins.typeOf file != "path") -> builtins.throw "file ${toString file} must a path";
+    assert (builtins.typeOf file != "path") -> throw "[npmlock2nix] file ${toString file} must a path";
     let content = readLockfile file; in
     content // {
       dependencies = lib.mapAttrs patchDependency content.dependencies;
@@ -114,7 +114,7 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , ...
     }@args:
-      assert (builtins.typeOf preInstallLinks != "set") -> throw "`preInstallLinks` must be an attributeset of attributesets";
+      assert (builtins.typeOf preInstallLinks != "set") -> throw "[npmlock2nix] `preInstallLinks` must be an attributeset of attributesets";
       let
         lockfile = readLockfile packageLockJson;
 
