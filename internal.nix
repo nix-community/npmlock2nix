@@ -70,6 +70,17 @@ rec {
     mv node-* $out
   '';
 
+  # Extract the attributes that are relevant for building node_modules and use
+  # them as defaults in case the node_modules_attrs attribute doesn't have
+  # them.
+  # Type: Set -> Set
+  get_node_modules_attrs = { node_modules_attrs ? { }, ... }@attrs:
+    let
+      getAttr = name: from: lib.optionalAttrs (builtins.hasAttr name from) { "${name}" = from.${name}; };
+      getAttrs = names: from: lib.foldl (a: b: a // (getAttr b from)) { } names;
+    in
+    (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
+
   node_modules =
     { src
     , packageJson ? src + "/package.json"
@@ -171,9 +182,10 @@ rec {
     , ...
     }@attrs:
     let
-      nm = node_modules attrs;
+      nm = node_modules (get_node_modules_attrs attrs);
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
     in
-    mkShell {
+    mkShell ({
       buildInputs = [ nm.nodejs nm ];
       shellHook = ''
         export NODE_PATH="${nm}/node_modules:$NODE_PATH"
@@ -188,7 +200,7 @@ rec {
       ''
       );
       passthru.node_modules = nm;
-    };
+    } // extraAttrs);
 
   build =
     { src
@@ -196,16 +208,18 @@ rec {
     , installPhase
     , symlink_node_modules ? true
     , copy_node_modules ? false
-    , buildBuildInputs ? [ ]
+    , buildInputs ? [ ]
     , ...
     }@attrs:
     let
-      nm = node_modules (builtins.removeAttrs attrs [ "buildBuildInputs" "copy_node_modules" "npmCommands" "installPhase" ]);
+      nm = node_modules (get_node_modules_attrs attrs);
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
     in
-    stdenv.mkDerivation {
+    stdenv.mkDerivation ({
       pname = nm.pname;
       version = nm.version;
-      buildInputs = [ nm ] ++ buildBuildInputs;
+      buildInputs = [ nm ] ++ buildInputs;
+      inherit src installPhase;
 
       postUnpack =
         if !copy_node_modules && symlink_node_modules then ''
@@ -222,6 +236,5 @@ rec {
         ${lib.concatStringsSep "\n" npmCommands}
         runHook postBuild
       '';
-      inherit src installPhase;
-    };
+    } // extraAttrs);
 }

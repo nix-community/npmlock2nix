@@ -22,6 +22,13 @@ npmlock2nix.shell {
   src = ./.;
   nodejs = pkgs.nodejs-14_x;
   # symlink_node_modules = true, (default)
+  # You can override attributes passed to `node_modules` by setting
+  # `node_modules_attrs` like below.
+  # A few attributes (such as `nodejs` and `src`) are always inherited from the
+  # shell's arguments but can be overriden.
+  # node_modules_attrs = {
+  #   buildInputs = [ pkgs.libwebp ];
+  # };
 }
 ```
 
@@ -40,6 +47,13 @@ npmlock2nix.build {
   # optionally:
   # npmCommands = [ "npm run build" ];
   # symlink_node_modules = true, (default)
+  # You can override attributes passed to `node_modules` by setting
+  # `node_modules_attrs` like below.
+  # A few attributes (such as `nodejs` and `src`) are always inherited from the
+  # shell's arguments but can be overriden.
+  # node_modules_attrs = {
+  #   buildInputs = [ pkgs.libwebp ];
+  # };
 }
 ```
 

@@ -29,7 +29,7 @@ testLib.runTests {
     let
       drv = npmlock2nix.shell {
         src = ./examples-projects/single-dependency;
-        preBuild = "foobar in preBuild";
+        node_modules_attrs.preBuild = "foobar in preBuild";
       };
     in
     {
@@ -41,7 +41,7 @@ testLib.runTests {
     let
       drv = npmlock2nix.shell {
         src = ./examples-projects/single-dependency;
-        postBuild = "foobar in postBuild";
+        node_modules_attrs.postBuild = "foobar in postBuild";
       };
     in
     {
