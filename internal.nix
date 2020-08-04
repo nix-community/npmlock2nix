@@ -20,7 +20,9 @@ rec {
   makeSource = name: dependency:
     assert (builtins.typeOf name != "string") -> throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") -> throw "[npmlock2nix] Specification of dependency ${toString name} must be a set";
-    fetchurl (makeSourceAttrs name dependency);
+    if dependency ? resolved && dependency ? integrity then
+      fetchurl (makeSourceAttrs name dependency)
+    else throw "[npmlock2nix] A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`.";
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
