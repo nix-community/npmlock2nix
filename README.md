@@ -21,6 +21,14 @@ Put the following in your `shell.nix`:
 npmlock2nix.shell {
   src = ./.;
   nodejs = pkgs.nodejs-14_x;
+  # node_modules_mode = "symlink", (default; or "copy")
+  # You can override attributes passed to `node_modules` by setting
+  # `node_modules_attrs` like below.
+  # A few attributes (such as `nodejs` and `src`) are always inherited from the
+  # shell's arguments but can be overriden.
+  # node_modules_attrs = {
+  #   buildInputs = [ pkgs.libwebp ];
+  # };
 }
 ```
 
@@ -34,9 +42,18 @@ Put the following in your `shell.nix`:
 ```nix
 { pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
 npmlock2nix.build {
-  src = ./.;
+  src = ./.; # mandatory
+  installPhase = "cp -r dist $out"; # mandatory
   # optionally:
-  # npmCommands = [ "npm run build" ];
+  # buildCommands = [ "npm run build" ];
+  # node_modules_mode = "symlink", (default; or "copy")
+  # You can override attributes passed to `node_modules` by setting
+  # `node_modules_attrs` like below.
+  # A few attributes (such as `nodejs` and `src`) are always inherited from the
+  # shell's arguments but can be overriden.
+  # node_modules_attrs = {
+  #   buildInputs = [ pkgs.libwebp ];
+  # };
 }
 ```
 
@@ -57,6 +74,16 @@ rebuilding the project (with the same dependencies) quicker.
 { pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
 npmlock2nix.node_modules {
   src = ./.;
+  # buildInputs = [ … ];
+
+  # You can symlink files into the directory of a specific dependency using the
+  # preInstallLinks attribute. Below you see how you can create a link to the
+  # cwebp binary at `node_modules/cwebp-bin/cwebp`.
+  # preInstallLinks = {
+  #   "cwebp-bin" = {
+  #       "vendor/cweb-bin" = "${pkgs.libwebp}/bin/cwebp"
+  #   };
+  # };
 }
 ```
 

@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, runCommand, nodejs }:
+{ npmlock2nix, testLib, runCommand, nodejs, python3 }:
 testLib.runTests {
   testNodeModulesForEmptyDependencies = {
     expr =
@@ -64,5 +64,51 @@ testLib.runTests {
     }).nodejs;
     expected = "our-custom-nodejs-package";
   };
+
+  testNodeModulesPropagatesNodejs =
+    let
+      drv = npmlock2nix.node_modules {
+        src = ./examples-projects/no-dependencies;
+        nodejs = nodejs;
+      };
+    in
+    {
+      expr = drv.propagatedBuildInputs;
+      expected = [ nodejs ];
+    };
+
+  testHonorsPrePostBuildHook =
+    let
+      drv = npmlock2nix.node_modules {
+        src = ./examples-projects/single-dependency;
+        preBuild = ''
+          echo -n "preBuild" > preBuild-test
+        '';
+        postBuild = ''
+          echo -n "postBuild" > postBuild-test
+          mv *Build-test node_modules
+        '';
+      };
+    in
+    {
+      expr = builtins.readFile (runCommand "concat"
+        { } ''
+        cat ${drv + "/node_modules/preBuild-test"} ${drv + "/node_modules/postBuild-test"} > $out
+      ''
+      );
+      expected = "preBuildpostBuild";
+    };
+
+  testBuildsNativeExtensions =
+    let
+      drv = npmlock2nix.node_modules {
+        src = ./examples-projects/native-extensions;
+        buildInputs = [ python3 ];
+      };
+    in
+    {
+      expr = builtins.pathExists drv.outPath;
+      expected = true;
+    };
 
 }

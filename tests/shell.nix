@@ -23,4 +23,30 @@ testLib.runTests {
         node_modules_nodejs = custom_nodejs;
       };
     };
+
+  # test that we are passing the pre- & postBuild attributes to node_modules
+  testPassPreBuildAttributeToNodeModules =
+    let
+      drv = npmlock2nix.shell {
+        src = ./examples-projects/single-dependency;
+        node_modules_attrs.preBuild = "foobar in preBuild";
+      };
+    in
+    {
+      expr = drv.node_modules.preBuild;
+      expected = "foobar in preBuild";
+    };
+
+  testPassPostBuildAttributeToNodeModules =
+    let
+      drv = npmlock2nix.shell {
+        src = ./examples-projects/single-dependency;
+        node_modules_attrs.postBuild = "foobar in postBuild";
+      };
+    in
+    {
+      expr = drv.node_modules.postBuild;
+      expected = "foobar in postBuild";
+    };
+
 }

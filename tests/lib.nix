@@ -24,7 +24,7 @@
     builtins.throw msg;
 
   # Takes an attribute set of tests
-  # an creates a bats script that executes them.
+  # an creates a smoke file that executes them.
   # Each tests set has this format:
   # { description
   # , shell
@@ -79,4 +79,8 @@
       exec ${smoke}/bin/smoke ${testScriptDir}
     '';
 
+  withoutNodeModules = src: lib.cleanSourceWith {
+    filter = name: type: ! (type == "directory" && name == "node_modules");
+    inherit src;
+  };
 }
