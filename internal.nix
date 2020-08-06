@@ -55,7 +55,7 @@ rec {
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Path -> Set
   patchLockfile = file:
-    assert (builtins.typeOf file != "path") -> builtins.throw "file ${toString file} must a path";
+    assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") -> builtins.throw "file ${toString file} must a path";
     let content = readLockfile file; in
     content // {
       dependencies = lib.mapAttrs patchDependency content.dependencies;
