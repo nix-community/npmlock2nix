@@ -139,6 +139,9 @@ rec {
               )}
 
             if grep -I -q -r '/bin/' .; then
+              # make all the binaries executable as otherwise patchShebangs will not patch them
+              test -d bin && chmod -R +x bin/
+
               source $stdenv/setup
               patchShebangs .
             fi
