@@ -43,11 +43,14 @@ rec {
     let
       isBundled = spec ? bundled && spec.bundled == true;
     in
-    spec // lib.optionalAttrs (!isBundled) ({
-      resolved = "file://" + (toString (makeSource name spec));
-    }) // lib.optionalAttrs (spec ? dependencies) {
-      dependencies = lib.mapAttrs patchDependency spec.dependencies;
-    };
+    if lib.hasPrefix "github:" (spec.from or "") || lib.hasPrefix "github:" (spec.source or "") then
+      throw "[npmlock2nix] The given package-lock.json contains sources that refer to GitHub. The source spec is often not precise enough to be translated into a (reliable) Nix git fetch invocation."
+    else
+      (spec // lib.optionalAttrs (!isBundled) ({
+        resolved = "file://" + (toString (makeSource name spec));
+      }) // lib.optionalAttrs (spec ? dependencies) {
+        dependencies = lib.mapAttrs patchDependency spec.dependencies;
+      });
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Path -> Set

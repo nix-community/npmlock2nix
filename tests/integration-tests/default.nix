@@ -187,4 +187,22 @@ testLib.makeIntegrationTests {
       ${libwebp}/bin/cwebp
     '';
   };
+  warnAboutGithubDependencies = {
+    description = ''
+      Ensure that we warn about github: dependencies and abort the eval if they are encoutered.
+    '';
+    evalFailure = true;
+    shell = npmlock2nix.shell {
+      src = ../examples-projects/github-dependency;
+    };
+    command = ''
+      exit 123
+    '';
+    status = 1;
+    expected = "";
+    expected-stderr = ''
+      error: [npmlock2nix] The given package-lock.json contains sources that refer to GitHub. The source spec is often not precise enough to be translated into a (reliable) Nix git fetch invocation.
+      (use '--show-trace' to show detailed location information)
+    '';
+  };
 }
