@@ -269,6 +269,10 @@ rec {
 
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
+
+                # make all the binaries executable as otherwise patchShebangs will not patch them
+                test -d bin && chmod -R +x bin/
+
                 patchShebangs .
               fi
             '';
