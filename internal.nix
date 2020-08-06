@@ -229,7 +229,7 @@ rec {
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "buildInputs" "installPhase" "buildCommands" "src" ];
     in
     stdenv.mkDerivation ({
       pname = nm.pname;
