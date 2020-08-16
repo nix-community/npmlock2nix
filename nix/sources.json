@@ -29,10 +29,10 @@
         "homepage": "",
         "owner": "SamirTalwar",
         "repo": "smoke",
-        "rev": "a7e57e662966f2d6534d30b76aa752a8da75c2f6",
-        "sha256": "0c0l4mpw0yckg1qnajmyr3h85d8zzp6123xcjg0bny8vpwczsgzl",
+        "rev": "7b9c96586c6851dbd7a7232fad3212c055c25272",
+        "sha256": "05zj4b7wj269z1wq2qn8k3ynk7hqprgccgzvjizxb1a7kss1ck4c",
         "type": "tarball",
-        "url": "https://github.com/SamirTalwar/smoke/archive/a7e57e662966f2d6534d30b76aa752a8da75c2f6.tar.gz",
+        "url": "https://github.com/SamirTalwar/smoke/archive/7b9c96586c6851dbd7a7232fad3212c055c25272.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
