@@ -1,4 +1,6 @@
 { lib
+, stdenv
+, runCommand
 , writeTextFile
 , writeShellScript
 , nix
@@ -54,7 +56,11 @@
             cd $WORKING_DIR
           ''}
           ${lib.optionalString (test ? setup-command) test.setup-command}
-          nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" test.command}"
+          ${if test.evalFailure or false then ''
+            nix-shell --pure ${../.} -A tests.integration-tests.shells.${name} --run "exit 23"
+          '' else ''
+            nix-shell --pure ${shellDrv} --run "${writeShellScript "${name}-command" test.command}"
+          ''}
         '';
       testScripts = lib.mapAttrs (name: test: test // { script = mkTestScript name test; inherit name; }) tests;
 
@@ -75,8 +81,20 @@
         text = builtins.toJSON smokeConfig;
       };
     in
-    writeShellScript "tests" ''
-      exec ${smoke}/bin/smoke ${testScriptDir}
+    runCommand "tests"
+      {
+        name = "tests";
+        text = ''
+          #!${stdenv.shell}
+          exec ${smoke}/bin/smoke ${testScriptDir}
+        '';
+        passthru = {
+          shells = lib.mapAttrs (_: v: v.shell) testScripts;
+        };
+        passAsFile = [ "text" ];
+      } ''
+      cp $textPath $out
+      chmod +x $out
     '';
 
   withoutNodeModules = src: lib.cleanSourceWith {
