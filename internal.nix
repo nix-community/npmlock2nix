@@ -126,6 +126,7 @@ rec {
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") -> throw "`preInstallLinks` must be an attributeset of attributesets";
+      assert !(builtins.pathExists packageLockJson) -> throw "the defined `packageLockJson` file doesn't exist. Is your `src` (or `packageLockJson`) attribute pointing to the right place?";
       let
         lockfile = readLockfile packageLockJson;
 
