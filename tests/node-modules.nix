@@ -111,4 +111,11 @@ testLib.runTests {
       expected = true;
     };
 
+  testPassesExtraParameters = {
+    expr = (npmlock2nix.node_modules {
+      src = ./examples-projects/single-dependency;
+      SOME_EXTRA_PARAMETER = "123";
+    }).SOME_EXTRA_PARAMETER or "attribute missing";
+    expected = "123";
+  };
 }

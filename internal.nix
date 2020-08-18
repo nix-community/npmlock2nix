@@ -139,15 +139,17 @@ rec {
               )}
 
             if grep -I -q -r '/bin/' .; then
-              source $stdenv/setup
+              source $TMP/preinstall-env
               patchShebangs .
             fi
 
           '';
           executable = true;
         };
+
+        extraArgs = builtins.removeAttrs args [ "preInstallLinks" ];
       in
-      stdenv.mkDerivation {
+      stdenv.mkDerivation (extraArgs // {
         inherit (lockfile) version;
         pname = lockfile.name;
         inherit src buildInputs preBuild postBuild;
@@ -175,6 +177,7 @@ rec {
         buildPhase = ''
           runHook preBuild
           mkdir -p node_modules/.hooks
+          declare -pf > $TMP/preinstall-env
           ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
           npm install --offline --nodedir=${nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
@@ -197,7 +200,7 @@ rec {
         passthru = {
           inherit nodejs;
         };
-      };
+      });
 
   shell =
     { node_modules_mode ? "symlink"

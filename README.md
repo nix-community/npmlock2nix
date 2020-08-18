@@ -84,6 +84,10 @@ npmlock2nix.node_modules {
   #       "vendor/cweb-bin" = "${pkgs.libwebp}/bin/cwebp"
   #   };
   # };
+
+  # You can set any desired environment by just adding them to this set just
+  # like you would do in a regular `stdenv.mkDerivation` invocation:
+  # MY_ENVIRONMENT_VARIABLE = "foo";
 }
 ```
 
