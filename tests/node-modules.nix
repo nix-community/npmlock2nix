@@ -118,4 +118,45 @@ testLib.runTests {
     }).SOME_EXTRA_PARAMETER or "attribute missing";
     expected = "123";
   };
+
+  testFiltersSourcesForJustPackageJson = {
+    expr = builtins.readFile ((npmlock2nix.node_modules {
+      src = ./examples-projects/single-dependency;
+
+      postBuild = ''
+        set -ex
+        if [ -e shell.nix ]; then
+          echo "The shell.nix file should have been remove due to source filtering"
+          exit 1;
+        fi
+
+        echo filtered-source > node_modules/test
+
+      '';
+    }) + "/node_modules/test");
+    expected = ''
+      filtered-source
+    '';
+  };
+
+  testFiltersSourcesDisabled = {
+    expr = builtins.readFile ((npmlock2nix.node_modules {
+      src = ./examples-projects/single-dependency;
+      filterSource = false;
+
+      postBuild = ''
+        set -ex
+        if [ ! -e shell.nix ]; then
+          echo "The shell.nix file should *NOT* have been remove due to source filtering"
+          exit 1;
+        fi
+
+        echo unfiltered-source > node_modules/test
+
+      '';
+    }) + "/node_modules/test");
+    expected = ''
+      unfiltered-source
+    '';
+  };
 }

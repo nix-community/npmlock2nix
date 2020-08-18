@@ -102,8 +102,19 @@ rec {
     in
     (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
 
+  # Filters the given src to only contain the `package.json` files.
+  # This makes it possible to strip down the build dependencies of e.g.
+  # node_modules to just the relevant pieces.
+  onlyPackageJsonFilter = src: lib.cleanSourceWith {
+    filter = name: type:
+      let basename = baseNameOf name; in basename == "package.json";
+    inherit src;
+  };
+
   node_modules =
     { src
+    , filterSource ? true
+    , sourceFilter ? onlyPackageJsonFilter
     , packageJson ? src + "/package.json"
     , packageLockJson ? src + "/package-lock.json"
     , buildInputs ? [ ]
@@ -152,7 +163,9 @@ rec {
       stdenv.mkDerivation (extraArgs // {
         inherit (lockfile) version;
         pname = lockfile.name;
-        inherit src buildInputs preBuild postBuild;
+        inherit buildInputs preBuild postBuild;
+
+        src = if filterSource then sourceFilter src else src;
 
         nativeBuildInputs = nativeBuildInputs ++ [
           nodejs

@@ -88,6 +88,15 @@ npmlock2nix.node_modules {
   # You can set any desired environment by just adding them to this set just
   # like you would do in a regular `stdenv.mkDerivation` invocation:
   # MY_ENVIRONMENT_VARIABLE = "foo";
+
+  # By default all sources are being filtered for just the relevant bits (e.g.
+  # the `package.json`) so the chances for false-positive rebuilds are minimal.
+  # If, for whatever reason, you have to turn the source filtering off you can just set:
+  # filterSource = false;
+
+  # If you instead want another source filter function, you can set the
+  # `sourceFilter` attribute to a function taking `src` as the first argument:
+  # sourceFilter = src: lib.cleanSourceWith { filter = name: type: …; inherit src; };
 }
 ```
 
