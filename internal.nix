@@ -146,8 +146,10 @@ rec {
           '';
           executable = true;
         };
+
+        extraArgs = builtins.removeAttrs args [ "preInstallLinks" ];
       in
-      stdenv.mkDerivation {
+      stdenv.mkDerivation (extraArgs // {
         inherit (lockfile) version;
         pname = lockfile.name;
         inherit src buildInputs preBuild postBuild;
@@ -198,7 +200,7 @@ rec {
         passthru = {
           inherit nodejs;
         };
-      };
+      });
 
   shell =
     { node_modules_mode ? "symlink"
