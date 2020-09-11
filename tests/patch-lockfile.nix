@@ -32,7 +32,7 @@ testLib.runTests {
     expected = {
       a = 1;
       foo = "something";
-      resolved = "file:///nix/store/k2rgngn9cmhz4g3kzxmvhx5r40qvnwcf-something.tgz";
+      resolved = "file:///nix/store/n0zkv46bvcasr2lak6lj09yjgnhia0hr-test";
       integrity = "sha1-00000000000000000000000+0RU=";
       dependencies = { };
     };
@@ -53,10 +53,10 @@ testLib.runTests {
     expected = {
       a = 1;
       foo = "something";
-      resolved = "file:///nix/store/k2rgngn9cmhz4g3kzxmvhx5r40qvnwcf-something.tgz";
+      resolved = "file:///nix/store/n0zkv46bvcasr2lak6lj09yjgnhia0hr-test";
       integrity = "sha1-00000000000000000000000+0RU=";
       dependencies.a = {
-        resolved = "file:///nix/store/1cf0n1xb5pad8ib3xyzbzzddfknfxvkc-somethingelse.tgz";
+        resolved = "file:///nix/store/cvx014pf1c8r8lfx3xnqrnn8nl5qnjd0-a";
         integrity = "sha1-00000000000000000000000+00U=";
       };
     };
@@ -78,7 +78,7 @@ testLib.runTests {
 
   testPatchedLockFile = {
     expr = testLib.hashFile (npmlock2nix.internal.patchedLockfile ./examples-projects/nested-dependencies/package-lock.json);
-    expected = "980323c3a53d86ab6886f21882936cfe7c06ac633993f16431d79e3185084414";
+    expected = "5956967f875fd8f4de2202b42314b276a3e88c1daf882e77ab25e865b40721f9";
   };
 
 }
