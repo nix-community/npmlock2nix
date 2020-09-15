@@ -264,5 +264,10 @@ rec {
         ${lib.concatStringsSep "\n" buildCommands}
         runHook postBuild
       '';
+
+      passthru = {
+        node_modules = nm;
+        inherit (nm) nodejs;
+      };
     } // extraAttrs);
 }
