@@ -31,7 +31,7 @@ let self = rec {
     if dependency ?  resolved then
     fetchurl (makeSourceAttrs name dependency)
 
-    else builtins.trace name (builtins.fetchurl dependency.integrity);
+    else builtins.fetchurl dependency.integrity;
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
