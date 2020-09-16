@@ -14,6 +14,6 @@ let
 
 in
 pkgs.mkShell {
-  buildInputs = [ test-runner pkgs.nodejs pkgs.smoke pkgs.niv pkgs.nixpkgs-fmt ];
+  buildInputs = [ test-runner pkgs.nodejs pkgs.smoke pkgs.niv pkgs.nixpkgs-fmt pkgs.yarn ];
   inherit (pre-commit-hooks) shellHook;
 }

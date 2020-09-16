@@ -1,5 +1,5 @@
 # Helper library to parse yarn.lock files that are some custom format and not just JSON :(
-{ lib }:
+{ lib, internal, stdenv, nodejs, yarn, writeText }:
 let
   # Description: Split a file into logicla blocks of "dependencies", on dependency per block.
   # Type: String -> [ String ]
@@ -31,7 +31,6 @@ let
           line = assert builtins.length ls == 0 -> throw "no ${fieldName} line found in block for package ${name}"; let x = builtins.head ls; in builtins.substring (builtins.stringLength prefix) (builtins.stringLength x) x;
         in
         line;
-
 
       lines =
         let
@@ -103,22 +102,52 @@ let
     in
     map parseBlock (builtins.filter (block: block != "") (splitBlocks content));
 
-  toNpmLock = yarn:
-    let
-      mapDep = dep: {
-        inherit (dep) version resolved;
-      } // (if dep ? dependencies then { requires = dep.dependencies; } else {})
-      // (if dep ? integrity then { inherit (dep) integrity;} else {});
-    in
-    {
-      name = "ranz";
-      version = "0.0.0";
-      lockfileVersion = 1;
-      requires = true;
-      dependencies = builtins.listToAttrs (builtins.map (value: lib.nameValuePair value.name (mapDep value)) yarn);
-    };
+  patchDep = name: dep: let
+    src = internal.makeSource name dep;
+  in dep // {
+    resolved = "file:" + src;
+  };
 
+  patchFile = filePath:
+    let
+      parsedFile = parseFile filePath;
+      patchedDeps = builtins.listToAttrs (map (x: lib.nameValuePair x.name (patchDep x.name x)) parsedFile);
+
+      searchStrings = map (x: x.resolved) parsedFile;
+      replaceStrings = map (x: patchedDeps.${x.name}.resolved) parsedFile;
+
+      contents = builtins.readFile filePath;
+    in builtins.replaceStrings searchStrings replaceStrings contents;
+
+  # FIXME: deduplicate the code with the npmlock node_modules function
+  node_modules = {
+    src,
+    yarnLockFile ? src + "/yarn.lock",
+    packageJsonFile ? src + "/package.json"
+  }:
+  let
+    packageJson = builtins.fromJSON (builtins.readFile packageJsonFile);
+    patchedLockfile = writeText "yarn.lock" (patchFile yarnLockFile);
+  in
+  stdenv.mkDerivation {
+    name = packageJson.name;
+    inherit src;
+
+    buildInputs = [ yarn nodejs ];
+    postPatch = ''
+      ln -sf ${patchedLockfile} yarn.lock
+    '';
+
+    buildPhase = ''
+      yarn install --offline
+    '';
+
+    installPhase = ''
+      mkdir $out
+      mv node_modules $out
+    '';
+  };
 in
 {
-  inherit splitBlocks parseBlock unquote parseFile toNpmLock;
+  inherit splitBlocks parseBlock unquote parseFile patchFile patchDep node_modules;
 }

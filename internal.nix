@@ -1,8 +1,8 @@
 { nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, callPackage }:
-rec {
+let self = rec {
   default_nodejs = nodejs;
 
-  yarn = callPackage ./yarn.nix {};
+  yarn = callPackage ./yarn.nix { internal = self; };
 
   # Description: Replace all "bad" characters (those that aren't allowed in nix paths) with underscores.
   # Type: String -> String
@@ -275,4 +275,4 @@ rec {
         inherit (nm) nodejs;
       };
     } // extraAttrs);
-}
+}; in self

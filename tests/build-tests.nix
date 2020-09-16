@@ -52,4 +52,8 @@ symlinkAttrs {
     };
   };
 
+  build-yarn-node-modules = npmlock2nix.internal.yarn.node_modules {
+      src = ./examples-projects/simple-yarn-project;
+    };
+
 }
