@@ -1,11 +1,13 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, callPackage }:
 rec {
   default_nodejs = nodejs;
+
+  yarn = callPackage ./yarn.nix {};
 
   # Description: Replace all "bad" characters (those that aren't allowed in nix paths) with underscores.
   # Type: String -> String
   makeSafeName = name:
-    lib.replaceStrings ["@" "/"] ["_" "_"] name;
+    lib.replaceStrings ["@" "/" "^"] ["_" "_" "_"] name;
 
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
@@ -26,7 +28,10 @@ rec {
   makeSource = name: dependency:
     assert (builtins.typeOf name != "string") -> builtins.throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") -> builtins.throw "Specification of dependency ${toString name} must be a set";
-    fetchurl (makeSourceAttrs name dependency);
+    if dependency ?  resolved then
+    fetchurl (makeSourceAttrs name dependency)
+
+    else builtins.trace name (builtins.fetchurl dependency.integrity);
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
@@ -61,7 +66,7 @@ rec {
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Path -> Set
   patchLockfile = file:
-    assert (builtins.typeOf file != "path") -> builtins.throw "file ${toString file} must a path";
+#    assert (builtins.typeOf file != "path") -> builtins.throw "file ${toString file} must a path";
     let content = readLockfile file; in
     content // {
       dependencies = lib.mapAttrs patchDependency content.dependencies;

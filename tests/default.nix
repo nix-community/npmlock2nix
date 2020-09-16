@@ -13,4 +13,5 @@ in
   shell = callPackage ./shell.nix { };
   integration-tests = callPackage ./integration-tests { };
   build-tests = callPackage ./build-tests.nix { };
+  yarn = callPackage ./test-yarn.nix { };
 }
