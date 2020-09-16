@@ -7,7 +7,7 @@ let self = rec {
   # Description: Replace all "bad" characters (those that aren't allowed in nix paths) with underscores.
   # Type: String -> String
   makeSafeName = name:
-    lib.replaceStrings ["@" "/" "^"] ["_" "_" "_"] name;
+    lib.substring 0 20 (lib.replaceStrings ["@" "/" "^" "\"" "," " " "~" "|" ">" "<" "*"] ["_" "_" "_" "_" "_" "_" "_" "_" "_" "_" "_"] name);
 
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
@@ -28,10 +28,10 @@ let self = rec {
   makeSource = name: dependency:
     assert (builtins.typeOf name != "string") -> builtins.throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") -> builtins.throw "Specification of dependency ${toString name} must be a set";
-    if dependency ?  resolved then
+    if dependency ? integrity then
     fetchurl (makeSourceAttrs name dependency)
 
-    else builtins.fetchurl dependency.integrity;
+    else builtins.fetchurl dependency.resolved;
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
@@ -249,11 +249,12 @@ let self = rec {
     , buildCommands ? [ "npm run build" ]
     , installPhase
     , node_modules_mode ? "symlink"
+    , node_modules ? null
     , buildInputs ? [ ]
     , ...
     }@attrs:
     let
-      nm = node_modules (get_node_modules_attrs attrs);
+      nm = if node_modules != null then node_modules else self.node_modules (get_node_modules_attrs attrs);
       extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
     in
     stdenv.mkDerivation ({

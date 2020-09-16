@@ -1,6 +1,8 @@
 # Helper library to parse yarn.lock files that are some custom format and not just JSON :(
 { lib, internal, stdenv, nodejs, yarn, writeText }:
 let
+  default_nodejs = nodejs;
+
   # Description: Split a file into logicla blocks of "dependencies", on dependency per block.
   # Type: String -> [ String ]
   splitBlocks = text:
@@ -57,7 +59,8 @@ let
     ({
       inherit name version resolved;
     })// (
-      let res = builtins.tryEval integrity; in if res.success then { integrity = res.value; } else { })
+      let res = builtins.tryEval integrity; in if res.success then { integrity = res.value; } else { }
+    )
 
     // (if dependencies != null then { inherit dependencies; } else { });
 
@@ -102,11 +105,13 @@ let
     in
     map parseBlock (builtins.filter (block: block != "") (splitBlocks content));
 
-  patchDep = name: dep: let
-    src = internal.makeSource name dep;
-  in dep // {
-    resolved = "file:" + src;
-  };
+  patchDep = name: dep:
+    let
+      src = internal.makeSource name dep;
+    in
+    dep // {
+      resolved = "file:" + src;
+    };
 
   patchFile = filePath:
     let
@@ -117,36 +122,64 @@ let
       replaceStrings = map (x: patchedDeps.${x.name}.resolved) parsedFile;
 
       contents = builtins.readFile filePath;
-    in builtins.replaceStrings searchStrings replaceStrings contents;
+    in
+    builtins.replaceStrings searchStrings replaceStrings contents;
 
   # FIXME: deduplicate the code with the npmlock node_modules function
-  node_modules = {
-    src,
-    yarnLockFile ? src + "/yarn.lock",
-    packageJsonFile ? src + "/package.json"
-  }:
-  let
-    packageJson = builtins.fromJSON (builtins.readFile packageJsonFile);
-    patchedLockfile = writeText "yarn.lock" (patchFile yarnLockFile);
-  in
-  stdenv.mkDerivation {
-    name = packageJson.name;
-    inherit src;
+  node_modules =
+    { src
+    , filterSource ? true
+    , sourceFilter ? internal.onlyPackageJsonFilter
+    , yarnLockFile ? src + "/yarn.lock"
+    , packageJsonFile ? src + "/package.json"
+    , buildInputs ? [ ]
+    , nodejs ? default_nodejs
+    , ...
+    }@args:
+    let
+      packageJson = builtins.fromJSON (builtins.readFile packageJsonFile);
+      patchedLockfile = writeText "yarn.lock" (patchFile yarnLockFile);
+    in
+    stdenv.mkDerivation (args // {
+      pname = packageJson.name;
+      version = packageJson.version;
+      inherit src;
 
-    buildInputs = [ yarn nodejs ];
-    postPatch = ''
-      ln -sf ${patchedLockfile} yarn.lock
-    '';
+      buildInputs = [ yarn nodejs ] ++ buildInputs;
 
-    buildPhase = ''
-      yarn install --offline
-    '';
+      propagatedBuildInputs = [ nodejs ];
 
-    installPhase = ''
-      mkdir $out
-      mv node_modules $out
-    '';
-  };
+      setupHooks = [ ./set-paths.sh ];
+
+      postPatch = ''
+        ln -sf ${patchedLockfile} yarn.lock
+      '';
+
+      buildPhase = ''
+        runHook preBuild
+        yarn install --offline
+        test -d node_modules/.bin && patchShebangs node_modules/.bin
+
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+        mkdir $out
+
+        if test -d node_modules; then
+          if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
+            mv node_modules $out/
+            if test -d $out/node_modules/.bin; then
+              ln -s $out/node_modules/.bin $out/bin
+            fi
+          fi
+        fi
+        runHook postInstall
+      '';
+
+      passthru.nodejs = nodejs;
+    });
 in
 {
   inherit splitBlocks parseBlock unquote parseFile patchFile patchDep node_modules;
