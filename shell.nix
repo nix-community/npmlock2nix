@@ -7,6 +7,9 @@ let
 
   pre-commit-hooks = pkgs.nix-pre-commit-hooks.run {
     src = ./.;
+    tools = {
+      nixpkgs-fmt = pkgs.nixpkgs-fmt;
+    };
     hooks = {
       nixpkgs-fmt.enable = true;
     };
