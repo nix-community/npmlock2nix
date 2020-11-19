@@ -23,6 +23,20 @@ rec {
     rev = builtins.elemAt parts 6;
   };
 
+  buildTgzFromGitHub = { name, org, repo, rev, ref }:
+    let
+      src = builtins.fetchGit {
+        url = "https://github.com/${org}/${repo}";
+        inherit rev ref;
+      };
+    in
+    runCommand
+      name
+      { } ''
+      set +x
+      tar -C ${src} -cf $out ./
+    '';
+
   # Description: Turns a dependency with a from field of the format
   # `github:org/repo#revision` into a git fetcher
   # Type: String -> Set -> Path
@@ -37,15 +51,14 @@ rec {
     assert v.org != f.org -> throw "[npmlock2nix] version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
     assert v.repo != f.repo -> throw "[npmlock2nix] version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
     let
-      src = builtins.fetchGit ({
-        url = "https://github.com/${v.org}/${v.repo}";
-        inherit (v) rev;
+      src = buildTgzFromGitHub {
+        name = "${name}.tgz";
         ref = v.rev;
-      } // (lib.optionalAttrs (builtins.stringLength f.rev != 7) { }
-      ));
+        inherit (v) org repo rev;
+      };
     in
     lib.traceVal ((builtins.removeAttrs dependency [ "from" ]) // {
-      version = "file:" + (toString src);
+      version = "file://" + (toString src);
     });
 
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
@@ -109,15 +122,16 @@ rec {
   patchPackagefile = lockFile: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "[npmlock2nix] file ${toString file} must be a path or string";
-    let content = builtins.fromJSON (builtins.readFile file); in
+    let
+      content = builtins.fromJSON (builtins.readFile file);
+      patchDep = (name: version:
+        if lib.hasPrefix "github:" version then
+          lockFile.dependencies.${name}.version
+        else version);
+    in
     content // {
-      dependencies =
-        lib.mapAttrs
-          (name: version:
-            if lib.hasPrefix "github:" version then
-              lockFile.dependencies.${name}.version
-            else version)
-          content.dependencies;
+      dependencies = lib.mapAttrs patchDep content.dependencies;
+      devDependencies = lib.mapAttrs patchDep content.devDependencies;
     };
 
   patchedPackagefile = lockfile: file: writeText "package.json"
@@ -237,14 +251,14 @@ rec {
 
         postPatch = ''
           ln -sf ${patchedLockfile packageLockJson} package-lock.json
-          ln -sf ${patchedPackagefile (patchLockfile packageLockJson) packageJson} package-lock.json
+          ln -sf ${patchedPackagefile (patchLockfile packageLockJson) packageJson} package.json
         '';
 
         buildPhase = ''
           runHook preBuild
           mkdir -p node_modules/.hooks
           ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
-          npm install --offline --nodedir=${nodeSource nodejs}
+          npm ci --offline --nodedir=${nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
           rm -rf node_modules/.hooks
           runHook postBuild
