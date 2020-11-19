@@ -7,6 +7,8 @@ testLib.runTests {
       custom_nodejs = symlinkJoin {
         name = "custom-nodejs";
         paths = [ nodejs ];
+        version = "12.8.3";
+        src = "/foo";
       };
       drv = npmlock2nix.shell {
         src = ./examples-projects/single-dependency;

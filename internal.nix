@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, jq }:
 rec {
   default_nodejs = nodejs;
 
@@ -94,6 +94,22 @@ rec {
     # set. This makes the consuming code eaiser.
     if json ? dependencies then json else json // { dependencies = { }; };
 
+  stringToTgzPath = name: str:
+    let
+      gitAttrs = parseGitHubRef str;
+    in
+    buildTgzFromGitHub {
+      name = "${name}.tgz";
+      ref = gitAttrs.rev;
+      inherit (gitAttrs) org repo rev;
+    };
+
+  patchRequires = name: spec:
+    let
+      patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath name version else version;
+    in
+    lib.mapAttrs patchReq spec.requires;
+
 
   # Description: Patches a single dependency (recursively) by replacing the resolved URL with a store path
   # Type: String -> Set -> Set
@@ -104,14 +120,21 @@ rec {
       throw "[npmlock2nix] pec of dependency ${toString name} must be a set";
     let
       isBundled = spec ? bundled && spec.bundled == true;
+      hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
     in
-    lib.optionalAttrs
-      (!isBundled)
-      (makeSource name spec) //
-    lib.optionalAttrs
-      (spec ? dependencies) {
-      dependencies = lib.mapAttrs patchDependency spec.dependencies;
-    };
+    (spec //
+      lib.optionalAttrs
+        (!isBundled)
+        (makeSource name spec) //
+      lib.optionalAttrs
+        (hasGitHubRequires spec) {
+        requires = (patchRequires name spec);
+      } //
+      lib.optionalAttrs
+        (spec ? dependencies) {
+        dependencies = lib.mapAttrs patchDependency spec.dependencies;
+      }
+    );
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Path -> Set
@@ -129,21 +152,17 @@ rec {
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "[npmlock2nix] file ${toString file} must be a path or string";
     let
-      content =
-        let
-          data = builtins.fromJSON (builtins.readFile file);
-        in
-        if data ? devDependencies then data else data // { devDependencies = { }; };
-
+      # Read the file but also add empty `devDependencies` and `dependencies`
+      # if either are missing
+      content = builtins.fromJSON (builtins.readFile file);
       patchDep = (name: version:
         if lib.hasPrefix "github:" version then
           lockFile.dependencies.${name}.version
         else version);
+      dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
+      devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
     in
-    content // {
-      dependencies = lib.mapAttrs patchDep content.dependencies;
-      devDependencies = lib.mapAttrs patchDep content.devDependencies;
-    };
+    content // { inherit devDependencies dependencies; };
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
   # Type: Path -> Derivation
@@ -244,7 +263,7 @@ rec {
           executable = true;
         };
       in
-      stdenv.mkDerivation {
+      stdenv.mkDerivation ({
         inherit (lockfile) version;
         pname = lockfile.name;
         inherit src buildInputs preBuild postBuild;
@@ -266,15 +285,19 @@ rec {
         '';
 
         postPatch = ''
-          ln -sf ${patchedLockfile packageLockJson} package-lock.json
+          #ln -sf ${patchedLockfile packageLockJson} package-lock.json
+          cp ${patchedLockfile packageLockJson} package-lock.json
+          chmod +rw package-lock.json
           ln -sf ${patchedPackagefile (patchLockfile packageLockJson) packageJson} package.json
         '';
 
         buildPhase = ''
           runHook preBuild
           mkdir -p node_modules/.hooks
+          cat package-lock.json | ${jq}/bin/jq
           ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
-          npm ci --offline --nodedir=${nodeSource nodejs}
+          export HOME=.
+          npm i --offline --nodedir=${nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
           rm -rf node_modules/.hooks
           runHook postBuild
@@ -297,7 +320,7 @@ rec {
           lockfile = patchedLockfile packageLockJson;
           packagesfile = patchedPackagefile (patchLockfile packageLockJson) packageJson;
         };
-      };
+      } // cleanArgs);
 
   shell =
     { node_modules_mode ? "symlink"
