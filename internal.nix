@@ -16,6 +16,9 @@ rec {
     };
 
 
+  # Description: Takes a string of the format "github:org/repo#revision" and returns
+  # an attribute set { org, repo, rev }
+  # Type: String -> Set
   parseGitHubRef = str: rec {
     parts = builtins.split "[:#/]" str;
     org = builtins.elemAt parts 2;
@@ -23,6 +26,9 @@ rec {
     rev = builtins.elemAt parts 6;
   };
 
+  # Description: Takes an attribute set describing a git dependency and returns
+  # a .tgz of the repository as store path
+  # Type: Set -> Path
   buildTgzFromGitHub = { name, org, repo, rev, ref }:
     let
       src = builtins.fetchGit {
@@ -57,9 +63,9 @@ rec {
         inherit (v) org repo rev;
       };
     in
-    lib.traceVal ((builtins.removeAttrs dependency [ "from" ]) // {
+    (builtins.removeAttrs dependency [ "from" ]) // {
       version = "file://" + (toString src);
-    });
+    };
 
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
   # Type: String -> Set -> Derivation
@@ -123,7 +129,12 @@ rec {
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "[npmlock2nix] file ${toString file} must be a path or string";
     let
-      content = builtins.fromJSON (builtins.readFile file);
+      content =
+        let
+          data = builtins.fromJSON (builtins.readFile file);
+        in
+        if data ? devDependencies then data else data // { devDependencies = { }; };
+
       patchDep = (name: version:
         if lib.hasPrefix "github:" version then
           lockFile.dependencies.${name}.version
@@ -134,6 +145,8 @@ rec {
       devDependencies = lib.mapAttrs patchDep content.devDependencies;
     };
 
+  # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
+  # Type: Path -> Derivation
   patchedPackagefile = lockfile: file: writeText "package.json"
     (
       builtins.toJSON (patchPackagefile lockfile file)
@@ -144,14 +157,17 @@ rec {
   patchedLockfile = file: writeText "packages-lock.json"
     (builtins.toJSON (patchLockfile file));
 
-  # Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
+  # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
   # Type: Derivation -> Derivation
-  nodeSource = nodes: runCommand "node-sources-${nodejs.version}"
+  nodeSource = nodejs: runCommand "node-sources-${nodejs.version}"
     { } ''
     tar --no-same-owner --no-same-permissions -xf ${nodejs.src}
     mv node-* $out
   '';
 
+  # Description: Creates shell scripts to provide node_modules to the environment supporting
+  # two different modes: "symlink" and "copy"
+  # Type: Derivation -> String -> String
   add_node_modules_to_cwd = node_modules: mode:
     ''
       if test -e node_modules; then
@@ -170,7 +186,7 @@ rec {
       export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
     '';
 
-  # Extract the attributes that are relevant for building node_modules and use
+  # Description: Extract the attributes that are relevant for building node_modules and use
   # them as defaults in case the node_modules_attrs attribute doesn't have
   # them.
   # Type: Set -> Set
