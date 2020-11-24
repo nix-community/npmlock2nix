@@ -19,12 +19,18 @@ rec {
   # Description: Takes a string of the format "github:org/repo#revision" and returns
   # an attribute set { org, repo, rev }
   # Type: String -> Set
-  parseGitHubRef = str: rec {
-    parts = builtins.split "[:#/]" str;
-    org = builtins.elemAt parts 2;
-    repo = builtins.elemAt parts 4;
-    rev = builtins.elemAt parts 6;
-  };
+  parseGitHubRef = str:
+    let
+      parts = builtins.split "[:#/]" str;
+    in
+    assert !(builtins.length parts == 7) ->
+      builtins.throw "[npmlock2nix] failed to parse GitHub reference `${str}`. Expected a string of format `github:org/repo#revision`";
+    rec {
+      inherit parts;
+      org = builtins.elemAt parts 2;
+      repo = builtins.elemAt parts 4;
+      rev = builtins.elemAt parts 6;
+    };
 
   # Description: Takes an attribute set describing a git dependency and returns
   # a .tgz of the repository as store path
