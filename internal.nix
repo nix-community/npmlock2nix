@@ -100,6 +100,8 @@ rec {
     # set. This makes the consuming code eaiser.
     if json ? dependencies then json else json // { dependencies = { }; };
 
+  # Description: Turns a github string reference into a store path with a tgz of the reference
+  # Type: String -> String -> Path
   stringToTgzPath = name: str:
     let
       gitAttrs = parseGitHubRef str;
@@ -110,7 +112,9 @@ rec {
       inherit (gitAttrs) org repo rev;
     };
 
-  patchRequires = name: spec:
+  # Description: Patch the `requires` attributes of a dependency spec to refer to paths in the store
+  # Type: String -> Set -> Set
+  patchRequires = name: requires:
     let
       patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath name version else version;
     in
