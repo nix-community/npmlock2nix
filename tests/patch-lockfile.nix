@@ -93,7 +93,7 @@ testLib.runTests {
       let
         leftpad = (npmlock2nix.internal.patchLockfile ./examples-projects/github-dependency/package-lock.json).dependencies.leftpad;
       in
-      lib.hasPrefix "file:///nix/store/" leftpad.version;
+      lib.hasPrefix ("file://" + builtins.storeDir) leftpad.version;
     expected = true;
   };
 
