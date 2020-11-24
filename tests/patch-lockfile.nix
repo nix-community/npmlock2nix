@@ -1,6 +1,23 @@
 { npmlock2nix, testLib, lib }:
 testLib.runTests {
 
+  testPatchDependencyHandlesGitHubRefsInRequires = {
+    expr =
+      let
+        libxmljsUrl = (npmlock2nix.internal.patchDependency "test" {
+          version = "github:tmcw/leftpad#db1442a0556c2b133627ffebf455a78a1ced64b9";
+          from = "github:tmcw/leftpad#db1442a0556c2b133627ffebf455a78a1ced64b9";
+          integrity = "sha512-8/UvHFG90J4O4QNRzb0jB5Ni1QuvuB7XFTLfDMQnCzAsFemF29VKnNGUESFFcSP/r5WWh/PMe0YRz90+3IqsUA==";
+          requires = {
+            libxmljs = "github:znerol/libxmljs#0517e063347ea2532c9fdf38dc47878c628bf0ae";
+          };
+        }
+        ).requires.libxmljs;
+      in
+      lib.hasPrefix "/nix/store/" libxmljsUrl;
+    expected = true;
+  };
+
   testBundledDependenciesAreRetained = {
     expr = npmlock2nix.internal.patchDependency "test" {
       bundled = true;
@@ -69,6 +86,15 @@ testLib.runTests {
       in
       lib.count (dep: lib.hasPrefix "file:///nix/store/" dep.resolved) (lib.attrValues deps);
     expected = 1;
+  };
+
+  testPatchLockfileTurnsGitHubUrlsIntoStorePaths = {
+    expr =
+      let
+        leftpad = (npmlock2nix.internal.patchLockfile ./examples-projects/github-dependency/package-lock.json).dependencies.leftpad;
+      in
+      lib.hasPrefix "file:///nix/store/" leftpad.version;
+    expected = true;
   };
 
   testConvertPatchedLockfileToJSON = {
