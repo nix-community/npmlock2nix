@@ -46,7 +46,7 @@ rec {
       name
       { } ''
       set +x
-      tar -C ${src} -cf $out ./
+      tar -C ${src} -czf $out ./
     '';
 
   # Description: Turns a dependency with a from field of the format
