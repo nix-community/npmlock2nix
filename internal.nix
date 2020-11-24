@@ -118,7 +118,7 @@ rec {
     let
       patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath name version else version;
     in
-    lib.mapAttrs patchReq spec.requires;
+    lib.mapAttrs patchReq requires;
 
 
   # Description: Patches a single dependency (recursively) by replacing the resolved URL with a store path
@@ -138,7 +138,7 @@ rec {
         (makeSource name spec) //
       lib.optionalAttrs
         (hasGitHubRequires spec) {
-        requires = (patchRequires name spec);
+        requires = (patchRequires name spec.requires);
       } //
       lib.optionalAttrs
         (spec ? dependencies) {
