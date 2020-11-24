@@ -8,7 +8,7 @@ in
       let
         leftpad = (npmlock2nix.internal.patchPackagefile ./examples-projects/github-dependency/package.json).dependencies.leftpad;
       in
-      lib.hasPrefix "file:///nix/store" leftpad;
+      lib.hasPrefix ("file://" + builtins.storeDir) leftpad;
     expected = true;
   };
   testHandlesDevDependencies = {
@@ -16,7 +16,7 @@ in
       let
         leftpad = (npmlock2nix.internal.patchPackagefile ./examples-projects/github-dev-dependency/package.json).devDependencies.leftpad;
       in
-      lib.hasPrefix "file:///nix/store" leftpad;
+      lib.hasPrefix ("file://" + builtins.storeDir) leftpad;
     expected = true;
   };
 })
