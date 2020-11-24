@@ -14,7 +14,7 @@ testLib.runTests {
         }
         ).requires.libxmljs;
       in
-      lib.hasPrefix "/nix/store/" libxmljsUrl;
+      lib.hasPrefix builtins.storeDir libxmljsUrl;
     expected = true;
   };
 
