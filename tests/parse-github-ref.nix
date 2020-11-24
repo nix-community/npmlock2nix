@@ -15,5 +15,5 @@ in
     };
 
   # It would be nice if there was a way to test the failure
-  # case but Unfortunately we can't catch exceptions...
+  # case but unfortunately we can't catch exceptions...
 })
