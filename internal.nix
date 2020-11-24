@@ -158,7 +158,7 @@ rec {
 
   # Description: Rewrite all the `github:` references to store paths
   # Type: Path -> Set
-  patchPackagefile = lockFile: file:
+  patchPackagefile = file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "[npmlock2nix] file ${toString file} must be a path or string";
     let
@@ -167,7 +167,7 @@ rec {
       content = builtins.fromJSON (builtins.readFile file);
       patchDep = (name: version:
         if lib.hasPrefix "github:" version then
-          lockFile.dependencies.${name}.version
+          "file://${stringToTgzPath name version}"
         else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
@@ -176,9 +176,9 @@ rec {
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
   # Type: Path -> Derivation
-  patchedPackagefile = lockfile: file: writeText "package.json"
+  patchedPackagefile = file: writeText "package.json"
     (
-      builtins.toJSON (patchPackagefile lockfile file)
+      builtins.toJSON (patchPackagefile file)
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
@@ -295,10 +295,8 @@ rec {
         '';
 
         postPatch = ''
-          #ln -sf ${patchedLockfile packageLockJson} package-lock.json
-          cp ${patchedLockfile packageLockJson} package-lock.json
-          chmod +rw package-lock.json
-          ln -sf ${patchedPackagefile (patchLockfile packageLockJson) packageJson} package.json
+          ln -sf ${patchedLockfile packageLockJson} package-lock.json
+          ln -sf ${patchedPackagefile packageJson} package.json
         '';
 
         buildPhase = ''
@@ -327,7 +325,7 @@ rec {
         passthru = {
           inherit nodejs;
           lockfile = patchedLockfile packageLockJson;
-          packagesfile = patchedPackagefile (patchLockfile packageLockJson) packageJson;
+          packagesfile = patchedPackagefile packageJson;
         };
       } // cleanArgs);
 
