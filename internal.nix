@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, jq }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand }:
 rec {
   default_nodejs = nodejs;
 
@@ -300,7 +300,6 @@ rec {
         buildPhase = ''
           runHook preBuild
           mkdir -p node_modules/.hooks
-          cat package-lock.json | ${jq}/bin/jq
           ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
           export HOME=.
           npm i --offline --nodedir=${nodeSource nodejs}
