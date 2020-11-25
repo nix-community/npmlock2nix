@@ -11,7 +11,7 @@ in
   testSimpleCase = {
     expr =
       let
-        version = (i.makeGithubSource "leftpad" testDependency).version;
+        version = (i.makeGithubSource (_: null) "leftpad" testDependency).version;
       in
       lib.hasPrefix "file:///nix/store" version;
     expected = true;
@@ -20,7 +20,7 @@ in
   testDropsFrom = {
     expr =
       let
-        dep = i.makeGithubSource "leftpad" testDependency;
+        dep = i.makeGithubSource (_: null) "leftpad" testDependency;
       in
       dep ? from;
     expected = false;

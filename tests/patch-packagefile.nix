@@ -6,7 +6,7 @@ in
   testTurnsGitHubRefsToStorePaths = {
     expr =
       let
-        leftpad = (npmlock2nix.internal.patchPackagefile ./examples-projects/github-dependency/package.json).dependencies.leftpad;
+        leftpad = (npmlock2nix.internal.patchPackagefile (_: null) ./examples-projects/github-dependency/package.json).dependencies.leftpad;
       in
       lib.hasPrefix ("file://" + builtins.storeDir) leftpad;
     expected = true;
@@ -14,7 +14,7 @@ in
   testHandlesDevDependencies = {
     expr =
       let
-        leftpad = (npmlock2nix.internal.patchPackagefile ./examples-projects/github-dev-dependency/package.json).devDependencies.leftpad;
+        leftpad = (npmlock2nix.internal.patchPackagefile (_: null) ./examples-projects/github-dev-dependency/package.json).devDependencies.leftpad;
       in
       lib.hasPrefix ("file://" + builtins.storeDir) leftpad;
     expected = true;
