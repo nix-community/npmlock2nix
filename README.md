@@ -1,5 +1,5 @@
 # npmlock2nix
-[![CI](https://github.com/andir/npmlock2nix/workflows/Tests/badge.svg)](https://github.com/andir/npmlock2nix/actions)
+[![CI](https://github.com/Tweag/npmlock2nix/workflows/Tests/badge.svg)](https://github.com/andir/npmlock2nix/actions)
 
 Utilizing npm lockfiles to create Nix expressions for NPM based projects. This
 projects aims to provide the following high-level build outputs:
