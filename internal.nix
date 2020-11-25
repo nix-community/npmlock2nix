@@ -121,7 +121,7 @@ rec {
     lib.mapAttrs patchReq requires;
 
 
-  # Description: Patches a single dependency (recursively) by replacing the resolved URL with a store path
+  # Description: Patches a single lockfile dependency (recursively) by replacing the resolved URL with a store path
   # Type: String -> Set -> Set
   patchDependency = name: spec:
     assert (builtins.typeOf name != "string") ->
@@ -131,20 +131,15 @@ rec {
     let
       isBundled = spec ? bundled && spec.bundled == true;
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
+      patchSource = lib.optionalAttrs (!isBundled) (makeSource name spec);
+      patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires name spec.requires); };
+      patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs patchDependency spec.dependencies; };
     in
-    (spec //
-      lib.optionalAttrs
-        (!isBundled)
-        (makeSource name spec) //
-      lib.optionalAttrs
-        (hasGitHubRequires spec) {
-        requires = (patchRequires name spec.requires);
-      } //
-      lib.optionalAttrs
-        (spec ? dependencies) {
-        dependencies = lib.mapAttrs patchDependency spec.dependencies;
-      }
-    );
+    # For our purposes we need a dependency with
+      # - `resolved` set to a path in the nix store (`patchSource`)
+      # - All `requires` entries of this dependency that are set to github URLs set to a path in the nix store (`patchRequiresSources`)
+      # - This needs to be done recursively for all `dependencies` in the lockfile (`patchDependenciesSources`)
+    (spec // patchSource // patchRequiresSources // patchDependenciesSources);
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Path -> Set
