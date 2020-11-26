@@ -40,12 +40,14 @@ rec {
   buildTgzFromGitHub = { name, org, repo, rev, ref, hash ? null }:
     let
       src =
-        if hash != null then fetchFromGitHub {
-          owner = org;
-          inherit repo;
-          inherit rev;
-          sha256 = hash; # FIXME: what if sha3?
-        } else
+        if hash != null then
+          fetchFromGitHub
+            {
+              owner = org;
+              inherit repo;
+              inherit rev;
+              sha256 = hash; # FIXME: what if sha3?
+            } else
           builtins.fetchGit {
             url = "https://github.com/${org}/${repo}";
             inherit rev ref;
