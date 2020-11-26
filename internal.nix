@@ -33,7 +33,9 @@ rec {
     };
 
   # Description: Takes an attribute set describing a git dependency and returns
-  # a .tgz of the repository as store path
+  # a .tgz of the repository as store path. If the attribute hash contains a
+  # hash attribute it will provide the value to `fetchFromGitHub` which will
+  # also work in restricted evaluation.
   # Type: Set -> Path
   buildTgzFromGitHub = { name, org, repo, rev, ref, hash ? null }:
     let
@@ -57,8 +59,10 @@ rec {
     '';
 
   # Description: Turns a dependency with a from field of the format
-  # `github:org/repo#revision` into a git fetcher
-  # Type: String -> Set -> Path
+  # `github:org/repo#revision` into a git fetcher. The fetcher can
+  # receive a hash value by calling 'sourceHashFunc' if a source hash
+  # map has been provided. Otherwise the function yields `null`.
+  # Type: Fn -> String -> Set -> Path
   makeGithubSource = sourceHashFunc: name: dependency:
     assert !(dependency ? version) ->
       builtins.throw "Missing `version` attribute missing from `${name}`";
@@ -82,8 +86,8 @@ rec {
     };
 
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
-  # Type: String -> Set -> Derivation
-  makeSource = name: dependency: sourceHashFunc:
+  # Type: Fn -> String -> Set -> Derivation
+  makeSource = sourceHashFunc: name: dependency:
     assert (builtins.typeOf name != "string") ->
       throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") ->
@@ -109,7 +113,7 @@ rec {
     if json ? dependencies then json else json // { dependencies = { }; };
 
   # Description: Turns a github string reference into a store path with a tgz of the reference
-  # Type: String -> String -> Path
+  # Type: Fn -> String -> String -> Path
   stringToTgzPath = sourceHashFunc: name: str:
     let
       gitAttrs = parseGitHubRef str;
@@ -122,7 +126,7 @@ rec {
     };
 
   # Description: Patch the `requires` attributes of a dependency spec to refer to paths in the store
-  # Type: String -> Set -> Set
+  # Type: Fn -> String -> Set -> Set
   patchRequires = sourceHashFunc: name: requires:
     let
       patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath sourceHashFunc name version else version;
@@ -131,7 +135,7 @@ rec {
 
 
   # Description: Patches a single lockfile dependency (recursively) by replacing the resolved URL with a store path
-  # Type: String -> Set -> Set
+  # Type: Fn -> String -> Set -> Set
   patchDependency = sourceHashFunc: name: spec:
     assert (builtins.typeOf name != "string") ->
       throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
@@ -140,7 +144,7 @@ rec {
     let
       isBundled = spec ? bundled && spec.bundled == true;
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
-      patchSource = lib.optionalAttrs (!isBundled) (makeSource name spec sourceHashFunc);
+      patchSource = lib.optionalAttrs (!isBundled) (makeSource sourceHashFunc name spec);
       patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceHashFunc name spec.requires); };
       patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (patchDependency sourceHashFunc) spec.dependencies; };
     in
@@ -151,7 +155,7 @@ rec {
     (spec // patchSource // patchRequiresSources // patchDependenciesSources);
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
-  # Type: Path -> Set
+  # Type: Fn -> Path -> Set
   patchLockfile = sourceHashFunc: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "[npmlock2nix] file ${toString file} must be a path or string";
@@ -161,7 +165,7 @@ rec {
     };
 
   # Description: Rewrite all the `github:` references to store paths
-  # Type: Path -> Set
+  # Type: Fn -> Path -> Set
   patchPackagefile = sourceHashFunc: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "[npmlock2nix] file ${toString file} must be a path or string";
@@ -179,14 +183,14 @@ rec {
     content // { inherit devDependencies dependencies; };
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
-  # Type: Path -> Derivation
+  # Type: Fn -> Path -> Derivation
   patchedPackagefile = sourceHashFunc: file: writeText "package.json"
     (
       builtins.toJSON (patchPackagefile sourceHashFunc file)
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
-  # Type: Path -> Derivation
+  # Type: Fn -> Path -> Derivation
   patchedLockfile = sourceHashFunc: file: writeText "packages-lock.json"
     (builtins.toJSON (patchLockfile sourceHashFunc file));
 
