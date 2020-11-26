@@ -1,5 +1,6 @@
 { lib, npmlock2nix, testLib }:
 let
+  inherit (testLib) noGithubHashes;
   i = npmlock2nix.internal;
 
   testDependency = {
@@ -11,7 +12,7 @@ in
   testSimpleCase = {
     expr =
       let
-        version = (i.makeGithubSource (_: null) "leftpad" testDependency).version;
+        version = (i.makeGithubSource noGithubHashes "leftpad" testDependency).version;
       in
       lib.hasPrefix "file:///nix/store" version;
     expected = true;
@@ -20,7 +21,7 @@ in
   testDropsFrom = {
     expr =
       let
-        dep = i.makeGithubSource (_: null) "leftpad" testDependency;
+        dep = i.makeGithubSource noGithubHashes "leftpad" testDependency;
       in
       dep ? from;
     expected = false;
