@@ -242,33 +242,36 @@ rec {
         preinstall_node_modules = writeTextFile {
           name = "prepare";
           destination = "/node_modules/.hooks/prepare";
-          text = ''
-                        #! ${stdenv.shell}
-
-                        ${lib.concatStringsSep "\n" (
-                          lib.mapAttrsToList
-            (name: mappings: ''
-                              if [ "$npm_package_name" == "${name}" ]; then
-                              ${lib.concatStringsSep "\n"
-                                (lib.mapAttrsToList
-            (to: from: ''
-                                      dirname=$(dirname ${to})
-                                      mkdir -p $dirname
-                                      ln -s ${from} ${to}
-                                    '')
-            mappings
-                                )}
-                              fi
+          text =
+            let
+              preInstallLinkCommands = lib.concatStringsSep "\n" (
+                lib.mapAttrsToList
+                  (name: mappings: ''
+                    if [ "$npm_package_name" == "${name}" ]; then
+                    ${lib.concatStringsSep "\n"
+                      (lib.mapAttrsToList
+                          (to: from: ''
+                              dirname=$(dirname ${to})
+                              mkdir -p $dirname
+                              ln -s ${from} ${to}
                             '')
-            preInstallLinks
-                          )}
+                          mappings
+                      )}
+                    fi
+                  '')
+                  preInstallLinks
+              );
+            in
+            ''
+              #! ${stdenv.shell}
 
-                        if grep -I -q -r '/bin/' .; then
-                          source $TMP/preinstall-env
-                          patchShebangs .
-                        fi
+              ${preInstallLinkCommands}
 
-          '';
+              if grep -I -q -r '/bin/' .; then
+                source $TMP/preinstall-env
+                patchShebangs .
+              fi
+            '';
           executable = true;
         };
       in
