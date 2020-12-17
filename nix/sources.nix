@@ -28,7 +28,8 @@ let
 
           $ niv modify <package> -a type=tarball -a builtin=true
       ''
-      builtins_fetchTarball { inherit (spec) url sha256; };
+      builtins_fetchTarball
+      { inherit (spec) url sha256; };
 
   fetch_builtin-url = spec:
     builtins.trace
@@ -111,8 +112,9 @@ let
       (
         name: spec:
           if builtins.hasAttr "outPath" spec
-          then abort
-            "The values in sources.json should not have an 'outPath' attribute"
+          then
+            abort
+              "The values in sources.json should not have an 'outPath' attribute"
           else
             spec // { outPath = fetch config.pkgs name spec; }
       )
