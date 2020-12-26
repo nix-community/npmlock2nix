@@ -12,12 +12,29 @@ The build results are incremental. Meaning that when you build the shell
 expression and afterwards the "build" you'll only have to run the build and not
 re-install all the node dependencies (which can take minutes).
 
+# Getting started
+
+To use npmlock2nix, clone this repository and add its path to your `NIX_PATH`. In NixOS, you can do this by specifying npmlock2nix alongside the default paths in your configuration files:
+
+```nix
+{ config, pkgs, ... }:
+{
+  nix.nixPath = [
+    "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos"
+    "nixos-config=/etc/nixos/configuration.nix"
+    "/nix/var/nix/profiles/per-user/root/channels"
+    "npmlock2nix=/path/to/your/clone/of/npmlock2nix"
+  ];
+}
+```
+
+
 # Usage as Shell
 
 Put the following in your `shell.nix`:
 
 ```nix
-{ pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
+{ pkgs ? import <nixpkgs> {}, npmlock2nix ? import <npmlock2nix> { inherit pkgs; } }:
 npmlock2nix.shell {
   src = ./.;
   nodejs = pkgs.nodejs-14_x;
@@ -40,7 +57,7 @@ FIXME: Currently this is targeting (mostly) the second class of builds. The firs
 Put the following in your `shell.nix`:
 
 ```nix
-{ pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
+{ pkgs ? import <nixpkgs> {}, npmlock2nix ? import <npmlock2nix> { inherit pkgs; } }:
 npmlock2nix.build {
   src = ./.; # mandatory
   installPhase = "cp -r dist $out"; # mandatory
@@ -71,7 +88,7 @@ rebuilding the project (with the same dependencies) quicker.
 
 
 ```nix
-{ pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
+{ pkgs ? import <nixpkgs> {}, npmlock2nix ? import <npmlock2nix> { inherit pkgs; } }:
 npmlock2nix.node_modules {
   src = ./.;
   # buildInputs = [ … ];
