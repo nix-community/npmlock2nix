@@ -193,18 +193,29 @@ rec {
   # two different modes: "symlink" and "copy"
   # Type: Derivation -> String -> String
   add_node_modules_to_cwd = node_modules: mode:
-    ''
-      if test -e node_modules; then
-        echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
-        exit 1
-      fi
-    '' +
     (
       if mode == "copy" then ''
+        if [[ -e node_modules ]]; then
+          echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
+          exit 1
+        fi
         cp --no-preserve=mode -r ${node_modules}/node_modules node_modules
         chmod -R u+rw node_modules
       '' else if mode == "symlink" then ''
-        ln -s ${node_modules}/node_modules node_modules
+        if [[ -e node_modules ]]; then
+          if [[ ! -L node_modules ]]; then
+            echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
+            exit 1
+          elif [[ $(readlink node_modules) == /nix/store/*/node_modules ]]; then
+            if [[ $(readlink node_modules) != "${node_modules}/node_modules" ]]; then
+              echo '[npmlock2nix] Updating node_modules symlink' >&2
+            fi
+          else
+            echo '[npmlock2nix] There is already a `node_modules` symlink. Not replacing it.' >&2
+            exit 1
+          fi
+        fi
+        ln -snf ${node_modules}/node_modules node_modules
       '' else throw "[npmlock2nix] node_modules_mode must be either `copy` or `symlink`"
     ) + ''
       export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
