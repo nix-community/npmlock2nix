@@ -361,6 +361,7 @@ rec {
     { node_modules_mode ? "symlink"
     , buildInputs ? [ ]
     , passthru ? { }
+    , shellHook ? ""
     , ...
     }@attrs:
     let
@@ -379,7 +380,7 @@ rec {
 
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
-      '';
+      '' + shellHook;
       passthru = passthru // {
         node_modules = nm;
       };
