@@ -366,7 +366,7 @@ rec {
       extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
     in
     mkShell ({
-      buildInputs = [ nm.nodejs nm ];
+      buildInputs = attrs.buildInputs or [ ] ++ [ nm.nodejs nm ];
       shellHook = ''
         # If node_modules is a managed symlink we can safely remove it and install a new one
         ${lib.optionalString (node_modules_mode == "symlink") ''
