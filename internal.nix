@@ -368,6 +368,13 @@ rec {
     mkShell ({
       buildInputs = [ nm.nodejs nm ];
       shellHook = ''
+        # If node_modules is a managed symlink we can safely remove it and install a new one
+        ${lib.optionalString (node_modules_mode == "symlink") ''
+          if [[ "$(readlink -f node_modules)" == ${builtins.storeDir}* ]]; then
+            rm -f node_modules
+          fi
+        ''}
+
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
       '';
