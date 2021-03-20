@@ -359,6 +359,8 @@ rec {
 
   shell =
     { node_modules_mode ? "symlink"
+    , buildInputs ? [ ]
+    , passthru ? { }
     , ...
     }@attrs:
     let
@@ -366,7 +368,7 @@ rec {
       extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
     in
     mkShell ({
-      buildInputs = attrs.buildInputs or [ ] ++ [ nm.nodejs nm ];
+      buildInputs = buildInputs ++ [ nm.nodejs nm ];
       shellHook = ''
         # If node_modules is a managed symlink we can safely remove it and install a new one
         ${lib.optionalString (node_modules_mode == "symlink") ''
@@ -378,7 +380,9 @@ rec {
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
       '';
-      passthru.node_modules = nm;
+      passthru = passthru // {
+        node_modules = nm;
+      };
     } // extraAttrs);
 
   build =
