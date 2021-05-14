@@ -88,17 +88,15 @@ npmlock2nix.node_modules {
   # You can run arbitrary shell operation for given module in given version,
   # using preInstallCustomCommands attribute. Below you see how you can
   # override path to esbuild module, depending on which version in needed.
-  # This approach comes in handy, if node_modules have two competing versions
+  # This approach may come in handy, if node_modules should have 2 competing versions
   # of the same module.
-  # Please note: set key must adhere to the pattern <module_name>@<module_version>.
-  # preInstallCustomCommands = {
-  #   "esbuild@0.8.57" = [''
-  #       sed -i -e 's|process.env.ESBUILD_BINARY_PATH|"${esbuild_0_8_57}/bin/esbuild"|g' ./install.js
-  #   ''];
-  #   "esbuild@0.11.12" = [''
-  #       sed -i -e 's|process.env.ESBUILD_BINARY_PATH|"${esbuild_0_11_12}/bin/esbuild"|g' ./install.js
-  #   ''];
-  # };
+  # preInstallCustomCommands = {}: ''
+  #   if [ "$npm_package_name@$npm_package_version" == "esbuild@0.8.57" ]; then
+  #     sed -i -e 's|process.env.ESBUILD_BINARY_PATH|"${esbuild_0_8_57}/bin/esbuild"|g' ./install.js
+  #   elif [ "$npm_package_name@$npm_package_version" == "esbuild@0.11.12" ]; then
+  #     sed -i -e 's|process.env.ESBUILD_BINARY_PATH|"${esbuild_0_11_12}/bin/esbuild"|g' ./install.js
+  #   fi
+  # '';
 
   # You can set any desired environment by just adding them to this set just
   # like you would do in a regular `stdenv.mkDerivation` invocation:

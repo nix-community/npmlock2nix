@@ -231,13 +231,13 @@ rec {
     , preBuild ? ""
     , postBuild ? ""
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
-    , preInstallCustomCommands ? { }
+    , preInstallCustomCommands ? {}: ""
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "[npmlock2nix] `preInstallLinks` must be an attributeset of attributesets";
-      assert (builtins.typeOf preInstallCustomCommands != "set") ->
-        throw "[npmlock2nix] `preInstallCustomCommands` must be an attributeset of list of commands";
+      assert (builtins.typeOf preInstallCustomCommands != "lambda") ->
+        throw "[npmlock2nix] `preInstallCustomCommands` must be a function";
       let
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "preInstallCustomCommands" ];
         lockfile = readLockfile packageLockJson;
@@ -264,22 +264,12 @@ rec {
                   '')
                   preInstallLinks
               );
-              preInstallCustomCmds = lib.concatStringsSep "\n" (
-                (lib.mapAttrsToList
-                  (name_at_version: cmds: ''
-                    if [ "$npm_package_name@$npm_package_version" == "${name_at_version}" ]; then
-                      ${lib.concatStringsSep "\n" cmds}
-                    fi''
-                  )
-                )
-                  preInstallCustomCommands
-              );
             in
             ''
               #! ${stdenv.shell}
 
               ${preInstallLinkCommands}
-              ${preInstallCustomCmds}
+              ${preInstallCustomCommands { }}
 
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
