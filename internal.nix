@@ -269,6 +269,10 @@ rec {
 
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
+
+                # make all the binaries executable as otherwise patchShebangs will not patch them
+                test -d bin && chmod -R +x bin/
+
                 patchShebangs .
               fi
             '';
@@ -359,7 +363,7 @@ rec {
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "buildInputs" "installPhase" "buildCommands" "src" ];
     in
     stdenv.mkDerivation ({
       pname = nm.pname;
