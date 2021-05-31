@@ -236,6 +236,13 @@ rec {
     in
     (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
 
+  # Description: Takes a dependency spec and a map of github sources/hashes and returns either the map or 'null'
+  # Type: Set -> Set -> Set | null
+  sourceHashFunc = githubSourceHashMap: spec:
+    if spec.type == "github" then
+      lib.attrByPath [ spec.value.org spec.value.repo spec.value.rev ] null githubSourceHashMap
+    else null;
+
   node_modules =
     { src
     , packageJson ? src + "/package.json"
@@ -291,10 +298,6 @@ rec {
           executable = true;
         };
 
-        sourceHashFunc = spec:
-          if spec.type == "github" then
-            lib.attrByPath [ spec.value.org spec.value.repo spec.value.rev ] null githubSourceHashMap
-          else null;
       in
       stdenv.mkDerivation ({
         inherit (lockfile) version;
@@ -318,8 +321,8 @@ rec {
         '';
 
         postPatch = ''
-          ln -sf ${patchedLockfile sourceHashFunc packageLockJson} package-lock.json
-          ln -sf ${patchedPackagefile sourceHashFunc packageJson} package.json
+          ln -sf ${patchedLockfile (sourceHashFunc githubSourceHashMap) packageLockJson} package-lock.json
+          ln -sf ${patchedPackagefile (sourceHashFunc githubSourceHashMap) packageJson} package.json
         '';
 
         buildPhase = ''
