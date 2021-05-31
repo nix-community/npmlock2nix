@@ -241,7 +241,8 @@ rec {
   sourceHashFunc = githubSourceHashMap: spec:
     if spec.type == "github" then
       lib.attrByPath [ spec.value.org spec.value.repo spec.value.rev ] null githubSourceHashMap
-    else null;
+    else
+      throw "[npmlock2nix] sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
   node_modules =
     { src
