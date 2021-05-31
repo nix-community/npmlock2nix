@@ -12,4 +12,4 @@ echo -e "\n\nRunning integration tests\n"
 $(nix-build  -A tests.integration-tests --no-out-link --show-trace)
 
 echo -e "\n\nTest githubSourceHashMap in restricted mode\n"
-nix-build tests/examples-projects/github-dependency/default.nix --restrict-eval -I . --allowed-uris 'https://github.com/NixOS/nixpkgs-channels' --show-trace
+nix-build tests/examples-projects/github-dependency/default.nix --restrict-eval -I . --allowed-uris 'https://github.com/nixos/nixpkgs' --show-trace
