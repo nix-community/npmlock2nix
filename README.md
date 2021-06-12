@@ -75,7 +75,13 @@ rebuilding the project (with the same dependencies) quicker.
 npmlock2nix.node_modules {
   src = ./.;
   # buildInputs = [ … ];
-
+  # If you want to use npmlock2nix in restricted evaluation mode (e.g hydra)
+  # you need to specify the hashes for the projects you want to use in a
+  # githubSourceHashMap as shown below (You can also pass this through
+  # via 'node_modules_attrs' in the `npmlock2nix.build`).
+  # githubSourceHashMap = {
+  #  someuser.somerepo."<rev>" = "<hash>";
+  # };
   # You can symlink files into the directory of a specific dependency using the
   # preInstallLinks attribute. Below you see how you can create a link to the
   # cwebp binary at `node_modules/cwebp-bin/cwebp`.
