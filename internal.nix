@@ -303,7 +303,8 @@ rec {
       stdenv.mkDerivation ({
         inherit (lockfile) version;
         pname = lockfile.name;
-        inherit src buildInputs preBuild postBuild;
+        inherit buildInputs preBuild postBuild;
+        dontUnpack = true;
 
         nativeBuildInputs = nativeBuildInputs ++ [
           nodejs
