@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC }:
+{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC, python3 }:
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
@@ -158,6 +158,24 @@ testLib.makeIntegrationTests {
       expected = "";
     };
 
+  buildInputsDoesntRemoveDefaultValues =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        buildInputs = [ python3 ];
+      };
+    in
+    {
+      description = ''
+        Ensure that providing additional buildInputs doesn't break our default buildInputs (e.g. nodejs).
+      '';
+      inherit shell;
+      command = ''
+        node --version > /dev/null || exit 1
+        python3 --version > /dev/null || exit 1
+      '';
+      expected = "";
+    };
 
   webpackCli = {
     description = ''

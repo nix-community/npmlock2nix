@@ -374,7 +374,7 @@ rec {
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" "shellHook" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" "shellHook" "buildInputs" ];
     in
     mkShell ({
       buildInputs = buildInputs ++ [ nm.nodejs nm ];
