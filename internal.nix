@@ -209,6 +209,13 @@ rec {
   # Type: Derivation -> String -> String
   add_node_modules_to_cwd = node_modules: mode:
     ''
+      # If node_modules is a managed symlink we can safely remove it and install a new one
+      ${lib.optionalString (mode == "symlink") ''
+        if [[ "$(readlink -f node_modules)" == ${builtins.storeDir}* ]]; then
+          rm -f node_modules
+        fi
+      ''}
+
       if test -e node_modules; then
         echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
         exit 1
@@ -371,13 +378,6 @@ rec {
     mkShell ({
       buildInputs = buildInputs ++ [ nm.nodejs nm ];
       shellHook = ''
-        # If node_modules is a managed symlink we can safely remove it and install a new one
-        ${lib.optionalString (node_modules_mode == "symlink") ''
-          if [[ "$(readlink -f node_modules)" == ${builtins.storeDir}* ]]; then
-            rm -f node_modules
-          fi
-        ''}
-
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
       '' + shellHook;

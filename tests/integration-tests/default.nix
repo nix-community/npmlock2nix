@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, callPackage, libwebp }:
+{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC }:
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
@@ -69,6 +69,33 @@ testLib.makeIntegrationTests {
         [npmlock2nix] There is already a `node_modules` directory. Not replacing it.
       '';
     };
+
+  symlinkNodeModulesDoesOverrideExistingNodeModulesWhenInStore =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "symlink";
+      };
+    in
+    {
+      description = ''
+        Ensure the shellHook doesn't override node_modules directory.
+      '';
+      inherit shell;
+      setup-command = ''
+        ln -s ${runCommandNoCC "node_modules-fake" { } "mkdir $out; touch $out/.fake"} node_modules
+      '';
+      command = ''
+        if [ -e node_modules/.fake ]; then
+          echo "expected the node_modules to be removed"
+          exit 1
+        fi
+        exit 0
+      '';
+      status = 0;
+      expected = "";
+    };
+
 
   copyNodeModulesDoesNotOverrideExistingNodeModules =
     let
