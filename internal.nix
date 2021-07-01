@@ -262,6 +262,7 @@ rec {
     , postBuild ? ""
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , githubSourceHashMap ? { }
+    , passthru ? { }
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
@@ -357,7 +358,7 @@ rec {
           fi
         '';
 
-        passthru = {
+        passthru = passthru // {
           inherit nodejs;
           lockfile = patchedLockfile packageLockJson;
           packagesfile = patchedPackagefile packageJson;
@@ -373,7 +374,7 @@ rec {
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" ];
     in
     mkShell ({
       buildInputs = buildInputs ++ [ nm.nodejs nm ];
@@ -392,11 +393,12 @@ rec {
     , installPhase
     , node_modules_mode ? "symlink"
     , buildInputs ? [ ]
+    , passthru ? { }
     , ...
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" ];
     in
     stdenv.mkDerivation ({
       pname = nm.pname;
@@ -412,6 +414,6 @@ rec {
         runHook postBuild
       '';
 
-      passthru.node_modules = nm;
+      passthru = passthru // { node_modules = nm; };
     } // extraAttrs);
 }

@@ -16,5 +16,6 @@ in
   shell = callPackage ./shell.nix { };
   integration-tests = callPackage ./integration-tests { };
   build-tests = callPackage ./build-tests.nix { };
+  build = callPackage ./build.nix { };
   source-hash-func = callPackage ./source-hash-func.nix { };
 }

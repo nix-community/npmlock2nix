@@ -51,4 +51,22 @@ testLib.runTests {
       expected = "foobar in postBuild";
     };
 
+  testPassthruIsHonored =
+    let
+      drv = npmlock2nix.shell {
+        src = ./examples-projects/single-dependency;
+        passthru.test-attribute = 123;
+      };
+    in
+    {
+      expr = {
+        inherit (drv.passthru) test-attribute;
+        has_node_modules = drv.passthru ? node_modules;
+      };
+      expected = {
+        test-attribute = 123;
+        has_node_modules = true;
+      };
+    };
+
 }
