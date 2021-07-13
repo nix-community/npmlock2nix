@@ -368,6 +368,7 @@ rec {
 
   shell =
     { node_modules_mode ? "symlink"
+    , node_modules_attrs ? { }
     , buildInputs ? [ ]
     , passthru ? { }
     , shellHook ? ""
@@ -392,6 +393,7 @@ rec {
     { src
     , buildCommands ? [ "npm run build" ]
     , installPhase
+    , node_modules_attrs ? { }
     , node_modules_mode ? "symlink"
     , buildInputs ? [ ]
     , passthru ? { }
