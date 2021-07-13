@@ -1,4 +1,4 @@
-{ lib, symlinkJoin, npmlock2nix, runCommand, libwebp }:
+{ lib, symlinkJoin, npmlock2nix, runCommand, libwebp, python3 }:
 let
   symlinkAttrs = attrs: runCommand "symlink-attrs"
     { }
@@ -52,4 +52,12 @@ symlinkAttrs {
     };
   };
 
+  passsing-buildInputs-doesnt-break-the-build = npmlock2nix.build {
+    src = ./examples-projects/webpack-cli-project;
+    installPhase = ''
+      cp -r dist $out
+    '';
+
+    buildInputs = [ python3 ];
+  };
 }

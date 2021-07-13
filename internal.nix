@@ -209,6 +209,13 @@ rec {
   # Type: Derivation -> String -> String
   add_node_modules_to_cwd = node_modules: mode:
     ''
+      # If node_modules is a managed symlink we can safely remove it and install a new one
+      ${lib.optionalString (mode == "symlink") ''
+        if [[ "$(readlink -f node_modules)" == ${builtins.storeDir}* ]]; then
+          rm -f node_modules
+        fi
+      ''}
+
       if test -e node_modules; then
         echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
         exit 1
@@ -255,6 +262,7 @@ rec {
     , postBuild ? ""
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , githubSourceHashMap ? { }
+    , passthru ? { }
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
@@ -351,7 +359,7 @@ rec {
           fi
         '';
 
-        passthru = {
+        passthru = passthru // {
           inherit nodejs;
           lockfile = patchedLockfile packageLockJson;
           packagesfile = patchedPackagefile packageJson;
@@ -360,19 +368,24 @@ rec {
 
   shell =
     { node_modules_mode ? "symlink"
+    , buildInputs ? [ ]
+    , passthru ? { }
+    , shellHook ? ""
     , ...
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" "shellHook" "buildInputs" ];
     in
     mkShell ({
-      buildInputs = [ nm.nodejs nm ];
+      buildInputs = buildInputs ++ [ nm.nodejs nm ];
       shellHook = ''
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
-      '';
-      passthru.node_modules = nm;
+      '' + shellHook;
+      passthru = passthru // {
+        node_modules = nm;
+      };
     } // extraAttrs);
 
   build =
@@ -381,11 +394,12 @@ rec {
     , installPhase
     , node_modules_mode ? "symlink"
     , buildInputs ? [ ]
+    , passthru ? { }
     , ...
     }@attrs:
     let
       nm = node_modules (get_node_modules_attrs attrs);
-      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" ];
+      extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" "buildInputs" ];
     in
     stdenv.mkDerivation ({
       pname = nm.pname;
@@ -401,6 +415,6 @@ rec {
         runHook postBuild
       '';
 
-      passthru.node_modules = nm;
+      passthru = passthru // { node_modules = nm; };
     } // extraAttrs);
 }

@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, callPackage, libwebp }:
+{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC, python3 }:
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
@@ -70,6 +70,33 @@ testLib.makeIntegrationTests {
       '';
     };
 
+  symlinkNodeModulesDoesOverrideExistingNodeModulesWhenInStore =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        node_modules_mode = "symlink";
+      };
+    in
+    {
+      description = ''
+        Ensure the shellHook doesn't override node_modules directory.
+      '';
+      inherit shell;
+      setup-command = ''
+        ln -s ${runCommandNoCC "node_modules-fake" { } "mkdir $out; touch $out/.fake"} node_modules
+      '';
+      command = ''
+        if [ -e node_modules/.fake ]; then
+          echo "expected the node_modules to be removed"
+          exit 1
+        fi
+        exit 0
+      '';
+      status = 0;
+      expected = "";
+    };
+
+
   copyNodeModulesDoesNotOverrideExistingNodeModules =
     let
       shell = npmlock2nix.shell {
@@ -131,6 +158,24 @@ testLib.makeIntegrationTests {
       expected = "";
     };
 
+  buildInputsDoesntRemoveDefaultValues =
+    let
+      shell = npmlock2nix.shell {
+        src = ../examples-projects/bin-project;
+        buildInputs = [ python3 ];
+      };
+    in
+    {
+      description = ''
+        Ensure that providing additional buildInputs doesn't break our default buildInputs (e.g. nodejs).
+      '';
+      inherit shell;
+      command = ''
+        node --version > /dev/null || exit 1
+        python3 --version > /dev/null || exit 1
+      '';
+      expected = "";
+    };
 
   webpackCli = {
     description = ''

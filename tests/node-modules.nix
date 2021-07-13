@@ -118,4 +118,12 @@ testLib.runTests {
     }).SOME_EXTRA_PARAMETER or "attribute missing";
     expected = "123";
   };
+
+  testHonorsPassedPassthru = {
+    expr = (npmlock2nix.node_modules {
+      src = ./examples-projects/single-dependency;
+      passthru.test-param = 123;
+    }).passthru.test-param;
+    expected = 123;
+  };
 }
