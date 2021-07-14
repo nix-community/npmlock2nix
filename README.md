@@ -156,7 +156,7 @@ Distributed under the Apache 2.0 License. See [license][license-url] for more de
 <!--Other external links -->
 [niv-url]: https://github.com/nmattia/niv
 [overlay-link]: https://nixos.org/manual/nixpkgs/stable/#chap-overlays
-[api-url]: https://www.example.com
+[api-url]: ./API.md
 [direnv-url]: https://direnv.net/
 [nix-pre-commit-hooks-url]: https://github.com/cachix/pre-commit-hooks.nix
 [nixpkgs-fmt-url]: https://github.com/nix-community/nixpkgs-fmt
