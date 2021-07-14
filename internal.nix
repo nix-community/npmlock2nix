@@ -367,7 +367,8 @@ rec {
       } // cleanArgs);
 
   shell =
-    { node_modules_mode ? "symlink"
+    { src
+    , node_modules_mode ? "symlink"
     , node_modules_attrs ? { }
     , buildInputs ? [ ]
     , passthru ? { }
