@@ -1,99 +1,164 @@
-# npmlock2nix
-[![CI](https://github.com/Tweag/npmlock2nix/workflows/Tests/badge.svg)](https://github.com/andir/npmlock2nix/actions)
 
-Utilizing npm lockfiles to create Nix expressions for NPM based projects. This
-projects aims to provide the following high-level build outputs:
+<!-- badges -->
+[![License][license-shield]][license-url]
+[![Contributors][contributors-shield]][contributors-url]
+[![Issues][issues-shield]][issues-url]
+[![PRs][pr-shield]][pr-url]
+[![Tests][test-shield]][test-url]
 
-* just the `node_modules` folder (the result of `npm install` or rather `npm ci`),
-* a shell expression that sets NODE_PATH to the above `node_modules` so you can work on your projects without running `npm install` (or similar) in your working directory.
-* a build (`npm run build` or similar; customizeable) utilizing the previously mentioned generated `node_modules` folder.
+<!-- teaser -->
+<br />
+<p align="center">
+  <h2 align="center">npmlock2nix</h2>
+  <p align="center">
+    Simple and unit tested solution to nixify npm based packages.
+  </p>
+</p>
 
-The build results are incremental. Meaning that when you build the shell
-expression and afterwards the "build" you'll only have to run the build and not
-re-install all the node dependencies (which can take minutes).
+## About
 
-# Usage as Shell
+_npmlock2nix_ is a Nix based library that parses the `package.json` and `package-lock.json` files in order to provide different outputs:
 
-Put the following in your `shell.nix`:
+1. A `shell` environment
+1. A `node_modules` derivation
+1. A custom `build` derivation
+
+### Features
+
+- No auto-generated code :heavy_check_mark:
+- Works in restricted evaluation :heavy_check_mark:
+- GitHub dependencies :heavy_check_mark:
+- Unit Tests :heavy_check_mark:
+- Integration Tests :heavy_check_mark:
+
+## Getting Started
+
+Since `npmlock2nix` is written entirely in Nix, there aren't any additional prerequisites, it just needs to be imported into your project.
+
+### Installation
+
+The preferred way to provide _npmlock2nix_ to your project is via [niv][niv-url]:
+
+```shell
+$ niv add Tweag/npmlock2nix
+```
+
+Assuming you are also tracking nixpkgs via niv, you can then provide _npmlock2nix_ to your project as a [nixpkgs overlay][overlay-link]
 
 ```nix
-{ pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
+# nix/default.nix
+let
+  sources = import ./sources.nix;
+in
+  import sources.nixpkgs {
+    overlays = [
+      (self: super: {
+        npmlock2nix = pkgs.callPackage sources.npmlock2nix { };
+      })
+    ];
+  }
+```
+
+Assuming the setup above, you can import `nix/default.nix` which will yield a nixpkgs set containing _npmlock2nix_.
+
+## Usage
+
+The following sections outline the main use-case scenarios of _npmlock2nix_.
+
+**Note**: All examples only reflect the most basic scenarios and mandatory arguments. For more details please refer to the [API documentation][api-url].
+
+**Note**: All code snippets provided below assume that _npmlock2nix_ has been imported and is inn scope and that there are valid `package.json` and `package-lock.json` files in the project root.
+
+### Providing A Shell
+
+```nix
 npmlock2nix.shell {
   src = ./.;
-  nodejs = pkgs.nodejs-14_x;
-  # node_modules_mode = "symlink", (default; or "copy")
-  # You can override attributes passed to `node_modules` by setting
-  # `node_modules_attrs` like below.
-  # A few attributes (such as `nodejs` and `src`) are always inherited from the
-  # shell's arguments but can be overriden.
-  # node_modules_attrs = {
-  #   buildInputs = [ pkgs.libwebp ];
-  # };
 }
 ```
+The `shell` function creates an environment with the `node_modules` installed that can be used for development purposes.
 
-# Building the project
+Please refer to the [API documentation][api-url] for additional information on `shell`.
 
-FIXME: There are two kinds of "projects". The first kind is where you package an application and the second kind is where you generate some JS, HTML, CSS, … through node.
-FIXME: Currently this is targeting (mostly) the second class of builds. The first class is what node2nix does and we should have something compatible.
 
-Put the following in your `shell.nix`:
-
-```nix
-{ pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
-npmlock2nix.build {
-  src = ./.; # mandatory
-  installPhase = "cp -r dist $out"; # mandatory
-  # optionally:
-  # buildCommands = [ "npm run build" ];
-  # node_modules_mode = "symlink", (default; or "copy")
-  # You can override attributes passed to `node_modules` by setting
-  # `node_modules_attrs` like below.
-  # A few attributes (such as `nodejs` and `src`) are always inherited from the
-  # shell's arguments but can be overriden.
-  # node_modules_attrs = {
-  #   buildInputs = [ pkgs.libwebp ];
-  # };
-}
-```
-
-# Building the `node_modules` folder
-
-Sometimes it is easier to hand-roll your projects build phase instead of
-reusing something that is not flexible enough or where the author didn't
-envision your use-case. Thus making just the `node_modules` folder (and it's
-transitive dependencies?) available is desireable.
-
-It also is a logical step for the other use cases as they will have to do this
-anyway. Having one derivation that produces the required node closure reduces
-the build times when both shell and package build are used. It also allows
-rebuilding the project (with the same dependencies) quicker.
-
+### Building `node_modules`
 
 ```nix
-{ pkgs ? import <nixpkgs> {}, nodelock2nix ? <FIXME> { inherit pkgs; } }:
 npmlock2nix.node_modules {
   src = ./.;
-  # buildInputs = [ … ];
-  # If you want to use npmlock2nix in restricted evaluation mode (e.g hydra)
-  # you need to specify the hashes for the projects you want to use in a
-  # githubSourceHashMap as shown below (You can also pass this through
-  # via 'node_modules_attrs' in the `npmlock2nix.build`).
-  # githubSourceHashMap = {
-  #  someuser.somerepo."<rev>" = "<hash>";
-  # };
-  # You can symlink files into the directory of a specific dependency using the
-  # preInstallLinks attribute. Below you see how you can create a link to the
-  # cwebp binary at `node_modules/cwebp-bin/cwebp`.
-  # preInstallLinks = {
-  #   "cwebp-bin" = {
-  #       "vendor/cweb-bin" = "${pkgs.libwebp}/bin/cwebp"
-  #   };
-  # };
-
-  # You can set any desired environment by just adding them to this set just
-  # like you would do in a regular `stdenv.mkDerivation` invocation:
-  # MY_ENVIRONMENT_VARIABLE = "foo";
 }
 ```
+The `node_modules` function creates a derivation containing the equivalent of running `npm install` in an impure environment.
 
+Please refer to the [API documentation][api-url] for additional information on `node_modules`.
+
+
+### Building A Project
+
+```nix
+npmlock2nix.build {
+  src = ./.;
+  installPhase = "cp -r dist $out";
+  buildCommands = [ "npm run build" ];
+}
+```
+The `build` function can be used to package arbitrary npm based projects. In order for this to work,
+_npmlock2nix_ must be told how to build the project (`buildCommands`) and how to install it (`installPhase`).
+
+Please refer to the [API documentation][api-url] for additional information on `build`.
+
+## Contributing
+
+Contributions to this project are welcome in the form of GitHub Issues or PRs. Please consider the following before creating PRs:
+
+- This project uses nixpkgs-fmt for formatting the Nix code. You can use `nix-shell --run "nixpkgs-fmt ."` to format everything.
+- If you are planning to make any considerable changes, you should first present your plans in a GitHub issue so it can be discussed
+- _npmlock2nix_ is developed with a strong emphasis on testing. Please consider providing tests along with your contributions and don't hesitate to ask for support.
+
+## Development
+
+When working on _npmlock2nix_ it's highly recommended to use [direnv][direnv-url] and the project's `shell.nix` which provides:
+
+- A commit hook for code formatting via [nix-pre-commit-hooks][nix-pre-commit-hooks-url].
+- A `test-runner` script that watches the source tree and runs the unit tests on changes.
+
+The integration tests can be executed via `nix-build -A tests.integration-tests`.
+
+## License
+
+Distributed under the Apache 2.0 License. See [license][license-url] for more details
+
+## Acknowledgements
+
+- [nixpkgs-fmt][nixpkgs-fmt-url]
+- [direnv][direnv-url]
+- [niv][niv-url]
+- [nix-pre-commit-hooks][nix-pre-commit-hooks-url]
+- [entr][entr-url]
+- [smoke][smoke-url]
+
+
+
+<!-- MARKDOWN LINKS & IMAGES -->
+
+[contributors-shield]: https://img.shields.io/github/contributors/othneildrew/Best-README-Template.svg?style=for-the-badge
+[contributors-url]: https://github.com/othneildrew/Best-README-Template/graphs/contributors
+[issues-shield]: https://img.shields.io/github/issues/Tweag/npmlock2nix.svg?style=for-the-badge
+[issues-url]: https://github.com/Tweag/npmlock2nix/issues
+[license-shield]: https://img.shields.io/github/license/Tweag/npmlock2nix.svg?style=for-the-badge
+[license-url]: https://github.com/Tweag/npmlock2nix/blob/master/LICENSE
+[test-shield]: https://img.shields.io/github/workflow/status/Tweag/npmlock2nix/Tests/master?style=for-the-badge
+[test-url]: https://github.com/Tweag/npmlock2nix/actions
+[pr-shield]: https://img.shields.io/github/issues-pr/Tweag/npmlock2nix.svg?style=for-the-badge
+[pr-url]: https://github.com/Tweag/npmlock2nix/pulls
+
+
+<!--Other external links -->
+[niv-url]: https://github.com/nmattia/niv
+[overlay-link]: https://nixos.org/manual/nixpkgs/stable/#chap-overlays
+[api-url]: ./API.md
+[direnv-url]: https://direnv.net/
+[nix-pre-commit-hooks-url]: https://github.com/cachix/pre-commit-hooks.nix
+[nixpkgs-fmt-url]: https://github.com/nix-community/nixpkgs-fmt
+[entr-url]: https://github.com/clibs/entr
+[smoke-url]: https://github.com/SamirTalwar/Smoke
