@@ -5,6 +5,7 @@
 [![Issues][issues-shield]][issues-url]
 [![PRs][pr-shield]][pr-url]
 [![Tests][test-shield]][test-url]
+[![Matrix][matrix-shield]][matrix-url]
 
 <!-- teaser -->
 <br />
@@ -151,6 +152,8 @@ Distributed under the Apache 2.0 License. See [license][license-url] for more de
 [test-url]: https://github.com/Tweag/npmlock2nix/actions
 [pr-shield]: https://img.shields.io/github/issues-pr/Tweag/npmlock2nix.svg?style=for-the-badge
 [pr-url]: https://github.com/Tweag/npmlock2nix/pulls
+[matrix-shield]: https://img.shields.io/matrix/npmlock2nix:kack.it.svg?style=for-the-badge
+[matrix-url]: https://matrix.to/#/#npmlock2nix:kack.it
 
 
 <!--Other external links -->
