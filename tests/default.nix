@@ -6,16 +6,16 @@ let
   };
 in
 {
+  build = callPackage ./build.nix { };
+  build-tests = callPackage ./build-tests.nix { };
+  integration-tests = callPackage ./integration-tests { };
   make-github-source = callPackage ./make-github-source.nix { };
-  parse-github-ref = callPackage ./parse-github-ref.nix { };
-  read-lockfile = callPackage ./read-lockfile { };
   make-source-urls = callPackage ./make-source-urls.nix { };
+  node-modules = callPackage ./node-modules.nix { };
+  parse-github-ref = callPackage ./parse-github-ref.nix { };
   patch-lockfile = callPackage ./patch-lockfile.nix { };
   patch-packagefile = callPackage ./patch-packagefile.nix { };
-  node-modules = callPackage ./node-modules.nix { };
+  read-lockfile = callPackage ./read-lockfile { };
   shell = callPackage ./shell.nix { };
-  integration-tests = callPackage ./integration-tests { };
-  build-tests = callPackage ./build-tests.nix { };
-  build = callPackage ./build.nix { };
   source-hash-func = callPackage ./source-hash-func.nix { };
 }
