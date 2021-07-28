@@ -45,7 +45,7 @@ The `shell` function takes an attribute set with the following attributes:
 The `build` function creates a derivation for an arbitrary npm package by letting the user specify how to build and install it.
 
 #### Arguments
-The `shell` function takes an attribute set with the following attributes:
+The `build` function takes an attribute set with the following attributes:
 
 - **src** *(mandatory)*: Path to the source containing `package.json` and `package-lock.json`.
 - **buildCommands** *(default `["npm run build"]`)*: List of commands to build the package.
