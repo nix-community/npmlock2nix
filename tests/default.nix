@@ -10,6 +10,7 @@ in
   build-tests = callPackage ./build-tests.nix { };
   integration-tests = callPackage ./integration-tests { };
   make-github-source = callPackage ./make-github-source.nix { };
+  make-source = callPackage ./make-source.nix { };
   make-source-urls = callPackage ./make-source-urls.nix { };
   node-modules = callPackage ./node-modules.nix { };
   parse-github-ref = callPackage ./parse-github-ref.nix { };
