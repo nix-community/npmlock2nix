@@ -100,6 +100,19 @@ rec {
       version = "file://" + (toString src);
     };
 
+  # Description: Checks if the given string looks like a vila HTTP or HTTPS url
+  # Type: String -> Bool
+  looksLikeUrl = s:
+    assert (builtins.typeOf s != "string") -> throw "[npmlock2nix] can only check strings if they are URL-like";
+    lib.hasPrefix "http://" s || lib.hasPrefix "https://" s;
+
+  # Description: Checks the given dependency spec if its version field should
+  # be used as URL in absence of a resolved attribute. In some cases the
+  # resolved field is missing but the version field contains a valid URL.
+  # Type: Set -> Bool
+  shouldUseVersionAsUrl = dependency:
+    dependency ? version && dependency ? integrity && ! (dependency ? resolved) && looksLikeUrl dependency.version;
+
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
   # Type: Fn -> String -> Set -> Derivation
   makeSource = sourceHashFunc: name: dependency:
@@ -111,6 +124,8 @@ rec {
       dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
     else if dependency ? from && dependency ? version then
       makeGithubSource sourceHashFunc name dependency
+    else if shouldUseVersionAsUrl dependency then
+      makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
     else throw "[npmlock2nix] A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
 
   # Description: Parses the lock file as json and returns an attribute set

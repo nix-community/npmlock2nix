@@ -126,4 +126,15 @@ testLib.runTests {
     }).passthru.test-param;
     expected = 123;
   };
+
+  testVersionAsResolvedUrl =
+    let
+      drv = npmlock2nix.node_modules {
+        src = ./examples-projects/url-as-version;
+      };
+    in
+    {
+      expr = builtins.pathExists drv.outPath;
+      expected = true;
+    };
 }
