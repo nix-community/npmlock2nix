@@ -80,8 +80,8 @@ rec {
   # Type: Fn -> String -> Set -> Path
   makeGithubSource = sourceHashFunc: name: dependency:
     assert !(dependency ? version) ->
-      builtins.throw "Missing `version` attribute missing from `${name}`";
-    assert (lib.hasPrefix "github: " dependency.version) -> builtins.throw "invalid prefix for `version` field of `${name}` expected `github:`, got: `${dependency.version}`.";
+      builtins.throw "[npmlock2nix] `version` attribute missing from `${name}`";
+    assert (lib.hasPrefix "github: " dependency.version) -> builtins.throw "[npmlock2nix] invalid prefix for `version` field of `${name}` expected `github:`, got: `${dependency.version}`.";
     let
       v = parseGitHubRef dependency.version;
       f = parseGitHubRef dependency.from;
