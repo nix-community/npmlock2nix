@@ -53,6 +53,21 @@ rec {
   isGitRev = str:
     (builtins.match "[0-9a-f]{40}" str) != null;
 
+  # Description: Takes a string of the format "git+http(s)://domain.tld/repo#branch" and returns
+  # an attribute set { url, rev }
+  # Type: String -> Set
+  parseGitRef = str:
+    let
+      parts = builtins.split "[#]" str;
+    in
+    assert !(builtins.length parts == 3) ->
+      builtins.throw "[npmlock2nix] failed to parse Git reference `${str}`. Expected a string of format `git+http(s)://domain.tld/repo#branch`";
+    rec {
+      inherit parts;
+      url = builtins.replaceStrings [ "git+" ] [ "" ] (builtins.elemAt parts 0);
+      rev = builtins.elemAt parts 2;
+    };
+
   # Description: Takes a string of the format "github:org/repo#revision" and returns
   # an attribute set { org, repo, rev }
   # Type: String -> Set
@@ -97,6 +112,29 @@ rec {
       set +x
       tar -C ${src} -czf $out ./
     '';
+
+  # Description: Turns a dependency with a from field of the format
+  # `git+http://domain.tld/repo#revision` into a git fetcher.
+  # Type: Fn -> String -> Set -> Path
+  makeGitSource = name: dependency:
+    assert !(dependency ? version) ->
+      builtins.throw "[npmlock2nix] `version` attribute missing from `${name}`";
+    let
+      v = parseGitRef dependency.version;
+      f = parseGitRef dependency.from;
+    in
+    assert v.url != f.url -> throw "[npmlock2nix] version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
+    let
+      src = fetchGit {
+        inherit (v) rev;
+        url = f.url;
+        ref = f.rev; #the rev part of the from field might actually be a ref
+      };
+    in
+    (builtins.removeAttrs dependency [ "from" ]) // {
+      resolved = "file://" + (toString src);
+      version = "file://" + (toString src);
+    };
 
   # Description: Turns a dependency with a from field of the format
   # `github:org/repo#revision` into a git fetcher. The fetcher can
@@ -149,7 +187,10 @@ rec {
     if dependency ? resolved && dependency ? integrity then
       dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
     else if dependency ? from && dependency ? version then
-      makeGithubSource sourceHashFunc name dependency
+      if lib.hasPrefix "github:" dependency.version then
+        makeGithubSource sourceHashFunc name dependency
+      else
+        makeGitSource name dependency
     else if shouldUseVersionAsUrl dependency then
       makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
     else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
@@ -236,7 +277,7 @@ rec {
         # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
         # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
         # wildcard dependency, which will make npm look at the lockfile.
-        if lib.hasPrefix "github:" version then
+        if lib.hasPrefix "git" version then
           "*"
         else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
