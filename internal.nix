@@ -106,6 +106,10 @@ rec {
             allRefs = true;
           };
     in
+    buildTgz { inherit name src; };
+
+  #TODO factor out elsewhere and note why we need this
+  buildTgz = { name, src }:
     runCommand
       name
       { } ''
@@ -113,6 +117,7 @@ rec {
       tar -C ${src} -czf $out ./
     '';
 
+  #TODO: this should say commitish instead of revision
   # Description: Turns a dependency with a from field of the format
   # `git+http://domain.tld/repo#revision` into a git fetcher.
   # Type: Fn -> String -> Set -> Path
@@ -125,11 +130,12 @@ rec {
     in
     assert v.url != f.url -> throw "[npmlock2nix] version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
     let
-      src = fetchGit {
+      src' = fetchGit {
         inherit (v) rev;
         url = f.url;
         ref = f.rev; #the rev part of the from field might actually be a ref
       };
+      src = buildTgz { name = "${name}.tgz"; src = src'; };
     in
     (builtins.removeAttrs dependency [ "from" ]) // {
       resolved = "file://" + (toString src);
