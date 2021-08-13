@@ -4,12 +4,20 @@ let
   i = npmlock2nix.internal;
 in
 (testLib.runTests {
-  testTurnsGitHubRefsToStorePaths = {
+  testTurnsGitHubRefsToWildcards = {
     expr =
       let
         leftpad = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dependency/package.json).dependencies.leftpad;
       in
-      lib.hasPrefix ("file://" + builtins.storeDir) leftpad;
+      leftpad == "*";
+    expected = true;
+  };
+  testHandlesBranches = {
+    expr =
+      let
+        leftpad = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dependency-branch/package.json).dependencies.leftpad;
+      in
+      leftpad == "*";
     expected = true;
   };
   testHandlesDevDependencies = {
@@ -17,7 +25,7 @@ in
       let
         leftpad = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dev-dependency/package.json).devDependencies.leftpad;
       in
-      lib.hasPrefix ("file://" + builtins.storeDir) leftpad;
+      leftpad == "*";
     expected = true;
   };
 })
