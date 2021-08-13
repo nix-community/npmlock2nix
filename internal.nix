@@ -33,6 +33,11 @@ rec {
   makeValidDrvName = str:
     lib.stringAsChars (c: if isValidDrvNameChar c then c else "?") str;
 
+  # Description: Checks if a string looks like a valid git revision
+  # Type: String -> Boolean
+  isGitRev = str:
+    (builtins.match "[0-9a-f]{40}" str) != null;
+
   # Description: Takes a string of the format "github:org/repo#revision" and returns
   # an attribute set { org, repo, rev }
   # Type: String -> Set
@@ -92,10 +97,11 @@ rec {
     in
     assert v.org != f.org -> throw "version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
     assert v.repo != f.repo -> throw "version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
+    assert !isGitRev v.rev -> throw "version of `${name}` does not specify a valid git rev: `${v.rev}`";
     let
       src = buildTgzFromGitHub {
         name = "${name}.tgz";
-        ref = v.rev;
+        ref = f.rev;
         inherit (v) org repo rev;
         hash = sourceHashFunc { type = "github"; value = v; };
       };
@@ -198,7 +204,7 @@ rec {
       dependencies = lib.mapAttrs (patchDependency sourceHashFunc) content.dependencies;
     };
 
-  # Description: Rewrite all the `github:` references to store paths
+  # Description: Rewrite all the `github:` references to wildcards.
   # Type: Fn -> Path -> Set
   patchPackagefile = sourceHashFunc: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
@@ -208,8 +214,14 @@ rec {
       # if either are missing
       content = builtins.fromJSON (builtins.readFile file);
       patchDep = (name: version:
+        # If the dependency is of the form github:owner/repo#branch the package-lock.json contains the specific
+        # revision that the branch was pointing at at the time of npm install.
+        # The package.json itself does not contain enough information to resolve a specific dependency,
+        # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
+        # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
+        # wildcard dependency, which will make npm look at the lockfile.
         if lib.hasPrefix "github:" version then
-          "file://${stringToTgzPath sourceHashFunc name version}"
+          "*"
         else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
