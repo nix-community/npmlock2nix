@@ -2,11 +2,15 @@
 rec {
   default_nodejs = nodejs;
 
+  # Description: Custom throw function that ensures our error messages have a common prefix.
+  # Type: String -> Throw
+  throw = str: builtins.throw "[npmlock2nix] ${str}";
+
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
   makeSourceAttrs = name: dependency:
-    assert !(dependency ? resolved) -> throw "[npmlock2nix] Missing `resolved` attribute for dependency `${name}`.";
-    assert !(dependency ? integrity) -> throw "[npmlock2nix] Missing `integrity` attribute for dependency `${name}`.";
+    assert !(dependency ? resolved) -> throw "Missing `resolved` attribute for dependency `${name}`.";
+    assert !(dependency ? integrity) -> throw "Missing `integrity` attribute for dependency `${name}`.";
     {
       url = dependency.resolved;
       # FIXME: for backwards compatibility we should probably set the
@@ -37,7 +41,7 @@ rec {
       parts = builtins.split "[:#/]" str;
     in
     assert !(builtins.length parts == 7) ->
-      builtins.throw "[npmlock2nix] failed to parse GitHub reference `${str}`. Expected a string of format `github:org/repo#revision`";
+      throw "failed to parse GitHub reference `${str}`. Expected a string of format `github:org/repo#revision`";
     rec {
       inherit parts;
       org = builtins.elemAt parts 2;
@@ -80,14 +84,14 @@ rec {
   # Type: Fn -> String -> Set -> Path
   makeGithubSource = sourceHashFunc: name: dependency:
     assert !(dependency ? version) ->
-      builtins.throw "[npmlock2nix] `version` attribute missing from `${name}`";
-    assert (lib.hasPrefix "github: " dependency.version) -> builtins.throw "[npmlock2nix] invalid prefix for `version` field of `${name}` expected `github:`, got: `${dependency.version}`.";
+      builtins.throw "version` attribute missing from `${name}`";
+    assert (lib.hasPrefix "github: " dependency.version) -> builtins.throw "invalid prefix for `version` field of `${name}` expected `github:`, got: `${dependency.version}`.";
     let
       v = parseGitHubRef dependency.version;
       f = parseGitHubRef dependency.from;
     in
-    assert v.org != f.org -> throw "[npmlock2nix] version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
-    assert v.repo != f.repo -> throw "[npmlock2nix] version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
+    assert v.org != f.org -> throw "version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
+    assert v.repo != f.repo -> throw "version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
     let
       src = buildTgzFromGitHub {
         name = "${name}.tgz";
@@ -103,7 +107,7 @@ rec {
   # Description: Checks if the given string looks like a vila HTTP or HTTPS url
   # Type: String -> Bool
   looksLikeUrl = s:
-    assert (builtins.typeOf s != "string") -> throw "[npmlock2nix] can only check strings if they are URL-like";
+    assert (builtins.typeOf s != "string") -> throw "can only check strings if they are URL-like";
     lib.hasPrefix "http://" s || lib.hasPrefix "https://" s;
 
   # Description: Checks the given dependency spec if its version field should
@@ -117,16 +121,16 @@ rec {
   # Type: Fn -> String -> Set -> Derivation
   makeSource = sourceHashFunc: name: dependency:
     assert (builtins.typeOf name != "string") ->
-      throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
+      throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") ->
-      throw "[npmlock2nix] Specification of dependency ${toString name} must be a set";
+      throw "Specification of dependency ${toString name} must be a set";
     if dependency ? resolved && dependency ? integrity then
       dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
     else if dependency ? from && dependency ? version then
       makeGithubSource sourceHashFunc name dependency
     else if shouldUseVersionAsUrl dependency then
       makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
-    else throw "[npmlock2nix] A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
+    else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
@@ -137,7 +141,7 @@ rec {
     in
     assert
     builtins.typeOf json != "set" ->
-    throw "[npmlock2nix] The NPM lockfile must be a valid JSON object";
+    throw "The NPM lockfile must be a valid JSON object";
     # if a lockfile doesn't declare dependencies ensure that we have an empty
     # set. This makes the consuming code eaiser.
     if json ? dependencies then json else json // { dependencies = { }; };
@@ -168,9 +172,9 @@ rec {
   # Type: Fn -> String -> Set -> Set
   patchDependency = sourceHashFunc: name: spec:
     assert (builtins.typeOf name != "string") ->
-      throw "[npmlock2nix] Name of dependency ${toString name} must be a string";
+      throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf spec != "set") ->
-      throw "[npmlock2nix] pec of dependency ${toString name} must be a set";
+      throw "spec of dependency ${toString name} must be a set";
     let
       isBundled = spec ? bundled && spec.bundled == true;
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
@@ -188,7 +192,7 @@ rec {
   # Type: Fn -> Path -> Set
   patchLockfile = sourceHashFunc: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
-      throw "[npmlock2nix] file ${toString file} must be a path or string";
+      throw "file ${toString file} must be a path or string";
     let content = readLockfile file; in
     content // {
       dependencies = lib.mapAttrs (patchDependency sourceHashFunc) content.dependencies;
@@ -198,7 +202,7 @@ rec {
   # Type: Fn -> Path -> Set
   patchPackagefile = sourceHashFunc: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
-      throw "[npmlock2nix] file ${toString file} must be a path or string";
+      throw "file ${toString file} must be a path or string";
     let
       # Read the file but also add empty `devDependencies` and `dependencies`
       # if either are missing
@@ -255,7 +259,7 @@ rec {
         chmod -R u+rw node_modules
       '' else if mode == "symlink" then ''
         ln -s ${node_modules}/node_modules node_modules
-      '' else throw "[npmlock2nix] node_modules_mode must be either `copy` or `symlink`"
+      '' else throw "node_modules_mode must be either `copy` or `symlink`"
     ) + ''
       export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
     '';
@@ -277,7 +281,7 @@ rec {
     if spec.type == "github" then
       lib.attrByPath [ spec.value.org spec.value.repo spec.value.rev ] null githubSourceHashMap
     else
-      throw "[npmlock2nix] sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
+      throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
   node_modules =
     { src
@@ -294,7 +298,7 @@ rec {
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
-        throw "[npmlock2nix] `preInstallLinks` must be an attributeset of attributesets";
+        throw "`preInstallLinks` must be an attributeset of attributesets";
       let
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
