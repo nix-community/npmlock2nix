@@ -273,7 +273,7 @@ rec {
       getAttr = name: from: lib.optionalAttrs (builtins.hasAttr name from) { "${name}" = from.${name}; };
       getAttrs = names: from: lib.foldl (a: b: a // (getAttr b from)) { } names;
     in
-    (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
+    (getAttrs [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "githubSourceHashMap" "passthru" ] attrs // node_modules_attrs);
 
   # Description: Takes a dependency spec and a map of github sources/hashes and returns either the map or 'null'
   # Type: Set -> Set -> Set | null
