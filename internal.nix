@@ -53,8 +53,8 @@ rec {
   isGitRev = str:
     (builtins.match "[0-9a-f]{40}" str) != null;
 
-  # Description: Takes a string of the format "git+http(s)://domain.tld/repo#branch" and returns
-  # an attribute set { url, rev }
+  # Description: Takes a string of the format "git+http(s)://domain.tld/repo#commitish" and returns
+  # an attribute set { url, commitish }
   # Type: String -> Set
   parseGitRef = str:
     let
@@ -65,7 +65,7 @@ rec {
     rec {
       inherit parts;
       url = builtins.replaceStrings [ "git+" ] [ "" ] (builtins.elemAt parts 0);
-      rev = builtins.elemAt parts 2;
+      commitish = builtins.elemAt parts 2;
     };
 
   # Description: Takes a string of the format "github:org/repo#revision" and returns
@@ -106,10 +106,11 @@ rec {
             allRefs = true;
           };
     in
-    buildTgz { inherit name src; };
+    buildTgz name src;
 
-  #TODO factor out elsewhere and note why we need this
-  buildTgz = { name, src }:
+  # Description: Takes a name and a directory and returns a .tgz of the directory as store path.
+  # Type: str -> Path -> Path
+  buildTgz = name: src:
     runCommand
       name
       { } ''
@@ -117,9 +118,8 @@ rec {
       tar -C ${src} -czf $out ./
     '';
 
-  #TODO: this should say commitish instead of revision
   # Description: Turns a dependency with a from field of the format
-  # `git+http://domain.tld/repo#revision` into a git fetcher.
+  # `git+http://domain.tld/repo#commitish` into a git fetcher.
   # Type: Fn -> String -> Set -> Path
   makeGitSource = name: dependency:
     assert !(dependency ? version) ->
@@ -131,11 +131,11 @@ rec {
     assert v.url != f.url -> throw "[npmlock2nix] version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
     let
       src' = fetchGit {
-        inherit (v) rev;
         url = f.url;
-        ref = f.rev; #the rev part of the from field might actually be a ref
+        rev = v.commitish;
+        ref = f.commitish;
       };
-      src = buildTgz { name = "${name}.tgz"; src = src'; };
+      src = buildTgz "${name}.tgz" src';
     in
     (builtins.removeAttrs dependency [ "from" ]) // {
       resolved = "file://" + (toString src);
