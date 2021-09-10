@@ -5,27 +5,15 @@ let
 in
 (testLib.runTests {
   testTurnsGitHubRefsToWildcards = {
-    expr =
-      let
-        leftpad = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dependency/package.json).dependencies.leftpad;
-      in
-      leftpad == "*";
-    expected = true;
+    expr = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dependency/package.json).dependencies.leftpad;
+    expected = "*";
   };
   testHandlesBranches = {
-    expr =
-      let
-        leftpad = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dependency-branch/package.json).dependencies.leftpad;
-      in
-      leftpad == "*";
-    expected = true;
+    expr = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dependency-branch/package.json).dependencies.leftpad;
+    expected = "*";
   };
   testHandlesDevDependencies = {
-    expr =
-      let
-        leftpad = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dev-dependency/package.json).devDependencies.leftpad;
-      in
-      leftpad == "*";
-    expected = true;
+    expr = (npmlock2nix.internal.patchPackagefile noGithubHashes ./examples-projects/github-dev-dependency/package.json).devDependencies.leftpad;
+    expected = "*";
   };
 })
