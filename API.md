@@ -12,10 +12,10 @@ The `node_modules` function takes an attribute set with the following attributes
 
 - **src** *(mandatory)*: Path to the source containing `package.json` and `package-lock.json`
 - **packageJson** *(default `src+"/package.json"`)*: Path to `package.json`
-- **packageLockJson** *(default `src+"/package-lock.json")*: Path to `package-lock.json`
-- **buildInputs** *(default `[]`)*: Additional build dependencies
-- **githubSourceHashMap** *(default: `{}`)*: Dependency hashes for evaluation in restricted mode (See [Concepts](#concepts) for details).
-- **preInstallLinks** *(default: `{}`)*: Map of symlinks to create inside npm dependencies in the `node_modules` output (See [Concepts](#concepts) for details).
+- **packageLockJson** *(default `src+"/package-lock.json"`)*: Path to `package-lock.json`
+- **nodejs** *(default `nixpkgs.nodejs`, which is the Active LTS version)*: Node.js derivation to use
+- **preInstallLinks** *(default `{}`)*: Map of symlinks to create inside npm dependencies in the `node_modules` output (See [Concepts](#concepts) for details).
+- **githubSourceHashMap** *(default `{}`)*: Dependency hashes for evaluation in restricted mode (See [Concepts](#concepts) for details).
 
 #### Notes
 - You may provide additional arguments accepted by `mkDerivation` all of which are going to be passed on.
@@ -32,7 +32,6 @@ The `shell` function takes an attribute set with the following attributes:
 
 - **src** *(mandatory)*: Path to the source containing `package.json` and `package-lock.json`
 - **node_modules_mode** *(default `"symlink"`)*: Determines how the `node_modules` should be provided (See [Concepts](#concepts) for details).
-- **buildInputs** *(default `[]`)*: Additional build dependencies that should be available in the shell.
 - **node_modules_attrs** *(default `{}`)*: Overrides that will be passed to the `node_modules` function (See [Concepts](#concepts) for details).
 
 
@@ -48,10 +47,10 @@ The `build` function creates a derivation for an arbitrary npm package by lettin
 The `build` function takes an attribute set with the following attributes:
 
 - **src** *(mandatory)*: Path to the source containing `package.json` and `package-lock.json`.
-- **buildCommands** *(default `["npm run build"]`)*: List of commands to build the package.
 - **installPhase** *(mandatory)*: Commands to install the package
-- **node_modules_mode** *(default `"symlink"`)*: Determines how the `node_modules` should be provided (See [Concepts](#concepts) for details).
+- **buildCommands** *(default `["npm run build"]`)*: List of commands to build the package.
 - **node_modules_attrs** *(default `{}`)*: Overrides that will be passed to the `node_modules` function (See [Concepts](#concepts) for details).
+- **node_modules_mode** *(default `"symlink"`)*: Determines how the `node_modules` should be provided (See [Concepts](#concepts) for details).
 
 #### Notes
 - You may provide additional arguments accepted by `mkDerivation` all of which are going to be passed on.
