@@ -314,7 +314,7 @@ rec {
           else ""; # pname is required, throw later
         version =
           if (args ? version && args.version != "") then args.version
-          else if (lockfile ? version&& lockfile.version != "") then lockfile.version
+          else if (lockfile ? version && lockfile.version != "") then lockfile.version
           else
             trace "No version in package-lock.json, using version 0.0.0. Optionally, set version in node_modules_attrs."
             "0.0.0";
