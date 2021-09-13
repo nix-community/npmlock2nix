@@ -273,7 +273,7 @@ rec {
       getAttr = name: from: lib.optionalAttrs (builtins.hasAttr name from) { "${name}" = from.${name}; };
       getAttrs = names: from: lib.foldl (a: b: a // (getAttr b from)) { } names;
     in
-    (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
+    ((getAttrs [ "src" "nodejs" ] attrs) // node_modules_attrs);
 
   # Description: Takes a dependency spec and a map of github sources/hashes and returns either the map or 'null'
   # Type: Set -> Set -> Set | null
@@ -295,6 +295,9 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , githubSourceHashMap ? { }
     , passthru ? { }
+    # allow to set package-name and version, if name or version are missing in package-lock.json
+    , pname ? ""
+    , version ? ""
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
@@ -302,6 +305,16 @@ rec {
       let
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
+
+        pnameComputed =
+          if (pname != "") then makeValidDrvName pname
+          else if (builtins.hasAttr "name" lockfile && lockfile.name != "") then lockfile.name
+          else ""; # pname is required, throw later
+
+        versionComputed =
+          if (version != "") then version
+          else if (builtins.hasAttr "version" lockfile && lockfile.version != "") then lockfile.version
+          else "0.0.0"; # version is optional
 
         preinstall_node_modules = writeTextFile {
           name = "prepare";
@@ -340,9 +353,10 @@ rec {
         };
 
       in
+      assert (pnameComputed == "") -> throw "A package name is required. Either fix the `package-lock.json` file, or set `pname` in `node_modules_attrs`.";
       stdenv.mkDerivation ({
-        inherit (lockfile) version;
-        pname = makeValidDrvName lockfile.name;
+        pname = pnameComputed;
+        version = versionComputed;
         inherit buildInputs preBuild postBuild;
         dontUnpack = true;
 
