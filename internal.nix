@@ -295,13 +295,14 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , githubSourceHashMap ? { }
     , passthru ? { }
+    , lockfilePostprocess ? x:x
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
-        lockfile = readLockfile packageLockJson;
+        lockfile = lockfilePostprocess (readLockfile packageLockJson);
 
         preinstall_node_modules = writeTextFile {
           name = "prepare";
