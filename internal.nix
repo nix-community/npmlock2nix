@@ -6,6 +6,10 @@ rec {
   # Type: String -> Throw
   throw = str: builtins.throw "[npmlock2nix] ${str}";
 
+  # Description: Custom trace function that ensures our info messages have a common prefix.
+  # Type: String -> Any
+  trace = str: retval: builtins.trace "[npmlock2nix] ${str}" retval;
+
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
   makeSourceAttrs = name: dependency:
@@ -314,7 +318,9 @@ rec {
         versionComputed =
           if (version != "") then version
           else if (builtins.hasAttr "version" lockfile && lockfile.version != "") then lockfile.version
-          else "0.0.0"; # version is optional
+          else
+            trace "No version in package-lock.json, using version 0.0.0. Optionally, set version in node_modules_attrs."
+            "0.0.0";
 
         preinstall_node_modules = writeTextFile {
           name = "prepare";
