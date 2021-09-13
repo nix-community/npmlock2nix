@@ -295,7 +295,7 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , githubSourceHashMap ? { }
     , passthru ? { }
-    , lockfilePostprocess ? x:x
+    , lockfilePostprocess ? x: x
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
