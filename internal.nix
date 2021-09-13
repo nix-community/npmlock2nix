@@ -301,7 +301,7 @@ rec {
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" "lockfilePostprocess" ];
         lockfile = lockfilePostprocess (readLockfile packageLockJson);
 
         preinstall_node_modules = writeTextFile {
