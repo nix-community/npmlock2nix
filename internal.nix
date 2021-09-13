@@ -299,25 +299,22 @@ rec {
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
     , githubSourceHashMap ? { }
     , passthru ? { }
-    # allow to set package-name and version, if name or version are missing in package-lock.json
-    , pname ? ""
-    , version ? ""
     , ...
     }@args:
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" "pname" "version" ];
         lockfile = readLockfile packageLockJson;
 
-        pnameComputed =
-          if (pname != "") then makeValidDrvName pname
-          else if (builtins.hasAttr "name" lockfile && lockfile.name != "") then lockfile.name
+        # allow to set package-name and version, if name or version are missing in package-lock.json
+        pname =
+          if (args ? pname && args.pname != "") then makeValidDrvName args.pname
+          else if (lockfile ? name && lockfile.name != "") then lockfile.name
           else ""; # pname is required, throw later
-
-        versionComputed =
-          if (version != "") then version
-          else if (builtins.hasAttr "version" lockfile && lockfile.version != "") then lockfile.version
+        version =
+          if (args ? version && args.version != "") then args.version
+          else if (lockfile ? version&& lockfile.version != "") then lockfile.version
           else
             trace "No version in package-lock.json, using version 0.0.0. Optionally, set version in node_modules_attrs."
             "0.0.0";
@@ -359,11 +356,9 @@ rec {
         };
 
       in
-      assert (pnameComputed == "") -> throw "A package name is required. Either fix the `package-lock.json` file, or set `pname` in `node_modules_attrs`.";
+      assert (pname == "") -> throw "A package name is required. Either set `name` in `package-lock.json`, or set `pname` in `node_modules_attrs`.";
       stdenv.mkDerivation ({
-        pname = pnameComputed;
-        version = versionComputed;
-        inherit buildInputs preBuild postBuild;
+        inherit pname version buildInputs preBuild postBuild;
         dontUnpack = true;
 
         nativeBuildInputs = nativeBuildInputs ++ [
