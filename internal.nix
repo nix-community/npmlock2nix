@@ -214,7 +214,9 @@ rec {
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
     in
-    content // { inherit devDependencies dependencies; };
+    content //
+      { inherit devDependencies dependencies; } //
+      { scripts = {}; }; # in function node_modules, ignore the install script for the root package
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
   # Type: Fn -> Path -> Derivation
@@ -427,6 +429,7 @@ rec {
       shellHook = ''
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
+        npm run install # run install script for the root package
       '' + shellHook;
       passthru = passthru // {
         node_modules = nm;
@@ -457,6 +460,7 @@ rec {
 
       buildPhase = ''
         runHook preBuild
+        npm run install # run install script for the root package
         ${lib.concatStringsSep "\n" buildCommands}
         runHook postBuild
       '';
