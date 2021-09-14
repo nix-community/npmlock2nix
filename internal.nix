@@ -286,13 +286,19 @@ rec {
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
   runInstallScriptsForRootPackage = ''
-    scriptList=$(jq -r '.scripts | keys[]' package.json)
     # https://docs.npmjs.com/cli/v7/using-npm/scripts#npm-install
+    allScripts=$(jq -r '.scripts | keys[]' package.json)
+    runScripts=""
     for script in preinstall install postinstall prepublish preprepare prepare postprepare; do
-      if ( echo "$scriptList" | grep "^$script$" >/dev/null ); then
-        npm run $script
+      if ( echo "$allScripts" | grep "^$script$" >/dev/null ); then
+        runScripts+=" $script"
       fi
     done
+    if [ ! -z "$runScripts" ]; then
+      echo "run install scripts for root package:"
+      for script in $runScripts; do echo "  npm run $script"; done # make easier to copy-paste
+      for script in $runScripts; do npm run $script || break; done
+    fi
   '';
 
   node_modules =
