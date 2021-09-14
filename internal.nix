@@ -310,8 +310,8 @@ rec {
         # allow to set package-name and version, if name or version are missing in package-lock.json
         pname =
           if (args ? pname && args.pname != "") then makeValidDrvName args.pname
-          else if (lockfile ? name && lockfile.name != "") then lockfile.name
-          else ""; # pname is required, throw later
+          else if (lockfile ? name && lockfile.name != "") then makeValidDrvName lockfile.name
+          else null; # pname is required, throw later
         version =
           if (args ? version && args.version != "") then args.version
           else if (lockfile ? version && lockfile.version != "") then lockfile.version
@@ -356,7 +356,7 @@ rec {
         };
 
       in
-      assert (pname == "") -> throw "A package name is required. Either set `name` in `package-lock.json`, or set `pname` in `node_modules_attrs`.";
+      assert (pname == null) -> throw "A package name is required. Either set `name` in `package-lock.json`, or set `pname` in `node_modules_attrs`.";
       stdenv.mkDerivation ({
         inherit pname version buildInputs preBuild postBuild;
         dontUnpack = true;
