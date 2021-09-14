@@ -331,9 +331,16 @@ rec {
 
               ${preInstallLinkCommands}
 
-              jq -r 'select(.bin != null) | .bin | if type == "string" then . else values[] end' package.json | while read binTarget; do
-                chmod +x "$binTarget" # patchShebangs will only patch executable files
-              done
+              # patchShebangs will only patch executable files
+              if [[ "$(pwd)" != "/build" ]]; then # ignore the root package. bin entries only make sense for dependencies
+                jq -r 'select(.bin != null) | .bin | if type == "string" then . else values[] end' package.json | while read binTarget; do
+                  if [[ ! -x "$binTarget" ]]; then
+                    echo "make binary executable: $(pwd)/$binTarget"
+                    chmod +x "$binTarget" || exit 1 # on error, throw ELIFECYCLE
+                  fi
+                done
+              fi
+
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
                 patchShebangs .
