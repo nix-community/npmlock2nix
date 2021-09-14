@@ -285,6 +285,16 @@ rec {
     else
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
+  runInstallScriptsForRootPackage = ''
+    scriptList=$(jq -r '.scripts | keys[]' package.json)
+    # https://docs.npmjs.com/cli/v7/using-npm/scripts#npm-install
+    for script in preinstall install postinstall prepublish preprepare prepare postprepare; do
+      if ( echo "$scriptList" | grep "^$script$" >/dev/null ); then
+        npm run $script
+      fi
+    done
+  '';
+
   node_modules =
     { src
     , packageJson ? src + "/package.json"
@@ -429,7 +439,7 @@ rec {
       shellHook = ''
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
-        npm run install # run install script for the root package
+        ${runInstallScriptsForRootPackage}
       '' + shellHook;
       passthru = passthru // {
         node_modules = nm;
@@ -460,7 +470,7 @@ rec {
 
       buildPhase = ''
         runHook preBuild
-        npm run install # run install script for the root package
+        ${runInstallScriptsForRootPackage}
         ${lib.concatStringsSep "\n" buildCommands}
         runHook postBuild
       '';
