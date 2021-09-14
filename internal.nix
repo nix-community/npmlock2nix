@@ -6,6 +6,10 @@ rec {
   # Type: String -> Throw
   throw = str: builtins.throw "[npmlock2nix] ${str}";
 
+  # Description: Custom trace function that ensures our info messages have a common prefix.
+  # Type: String -> Any
+  trace = str: retval: builtins.trace "[npmlock2nix] ${str}" retval;
+
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
   makeSourceAttrs = name: dependency:
@@ -273,7 +277,7 @@ rec {
       getAttr = name: from: lib.optionalAttrs (builtins.hasAttr name from) { "${name}" = from.${name}; };
       getAttrs = names: from: lib.foldl (a: b: a // (getAttr b from)) { } names;
     in
-    (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
+    ((getAttrs [ "src" "nodejs" ] attrs) // node_modules_attrs);
 
   # Description: Takes a dependency spec and a map of github sources/hashes and returns either the map or 'null'
   # Type: Set -> Set -> Set | null
@@ -300,8 +304,20 @@ rec {
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" "pname" "version" ];
         lockfile = readLockfile packageLockJson;
+
+        # allow to set package-name and version, if name or version are missing in package-lock.json
+        pname =
+          if (args ? pname && args.pname != "") then makeValidDrvName args.pname
+          else if (lockfile ? name && lockfile.name != "") then makeValidDrvName lockfile.name
+          else null; # pname is required, throw later
+        version =
+          if (args ? version && args.version != "") then args.version
+          else if (lockfile ? version && lockfile.version != "") then lockfile.version
+          else
+            trace "No version in package-lock.json, using version 0.0.0. Optionally, set version in node_modules_attrs."
+            "0.0.0";
 
         preinstall_node_modules = writeTextFile {
           name = "prepare";
@@ -340,10 +356,9 @@ rec {
         };
 
       in
+      assert (pname == null) -> throw "A package name is required. Either set `name` in `package-lock.json`, or set `pname` in `node_modules_attrs`.";
       stdenv.mkDerivation ({
-        inherit (lockfile) version;
-        pname = makeValidDrvName lockfile.name;
-        inherit buildInputs preBuild postBuild;
+        inherit pname version buildInputs preBuild postBuild;
         dontUnpack = true;
 
         nativeBuildInputs = nativeBuildInputs ++ [
