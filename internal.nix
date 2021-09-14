@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub, jq }:
 rec {
   default_nodejs = nodejs;
 
@@ -334,6 +334,17 @@ rec {
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
                 patchShebangs .
+
+                binElements=$(jq --raw-output 'select(has("bin")) | .bin | if type  == "string" then . else .[] end' package.json)
+                if [ -n "$binElements" ]; then
+                  while read binElement; do
+                    [ ! -x $binElement ] || continue
+
+                    echo "chmod and patch $(pwd)/$binElement"
+                    chmod +x $binElement
+                    patchShebangs $binElement
+                  done <<< "$binElements"
+                fi
               fi
             '';
           executable = true;
@@ -347,6 +358,7 @@ rec {
         dontUnpack = true;
 
         nativeBuildInputs = nativeBuildInputs ++ [
+          jq
           nodejs
         ];
 
