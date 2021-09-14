@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub, jq }:
 rec {
   default_nodejs = nodejs;
 
@@ -331,6 +331,9 @@ rec {
 
               ${preInstallLinkCommands}
 
+              cat package.json | jq -r '. | select(.bin != null) | .bin | values[]' | while read binTarget; do
+                chmod +x "$binTarget" # patchShebangs will only patch executable files
+              done
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
                 patchShebangs .
@@ -348,6 +351,7 @@ rec {
 
         nativeBuildInputs = nativeBuildInputs ++ [
           nodejs
+          jq
         ];
 
         propagatedBuildInputs = [
