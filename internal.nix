@@ -331,7 +331,7 @@ rec {
 
               ${preInstallLinkCommands}
 
-              cat package.json | jq -r '. | select(.bin != null) | .bin | values[]' | while read binTarget; do
+              jq -r '. | select(.bin != null) | .bin | values[]' package.json | while read binTarget; do
                 chmod +x "$binTarget" # patchShebangs will only patch executable files
               done
               if grep -I -q -r '/bin/' .; then
