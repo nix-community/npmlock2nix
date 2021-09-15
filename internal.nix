@@ -287,7 +287,7 @@ rec {
 
   runInstallScriptsForRootPackage = ''
     # https://docs.npmjs.com/cli/v7/using-npm/scripts#npm-install
-    allScripts=$(jq -r '.scripts | keys[]' package.json)
+    allScripts=$(jq -r 'select(.scripts != null) | .scripts | keys[]' package.json)
     runScripts=""
     for script in preinstall install postinstall prepublish preprepare prepare postprepare; do
       if ( echo "$allScripts" | grep "^$script$" >/dev/null ); then
