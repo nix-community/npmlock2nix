@@ -285,7 +285,7 @@ rec {
     else
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
-  runInstallScriptsForRootPackage = ''
+  runInstallScriptsForRootPackage = { dontRun ? false }: ''
     # https://docs.npmjs.com/cli/v7/using-npm/scripts#npm-install
     allScripts=$(jq -r 'select(.scripts != null) | .scripts | keys[]' package.json)
     runScripts=""
@@ -295,9 +295,13 @@ rec {
       fi
     done
     if [ ! -z "$runScripts" ]; then
-      echo "run install scripts for root package:"
+      echo "install scripts for the root package:"
       for script in $runScripts; do echo "  npm run $script"; done # make easier to copy-paste
-      for script in $runScripts; do npm run $script || break; done
+      if [[ "${toString dontRun}" == "0" ]]; then
+        for script in $runScripts; do npm run $script || break; done
+      else
+        echo "please run these scripts manually"
+      fi
     fi
   '';
 
@@ -445,7 +449,7 @@ rec {
       shellHook = ''
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
-        ${runInstallScriptsForRootPackage}
+        ${runInstallScriptsForRootPackage { dontRun = true; }}
       '' + shellHook;
       passthru = passthru // {
         node_modules = nm;
@@ -476,7 +480,7 @@ rec {
 
       buildPhase = ''
         runHook preBuild
-        ${runInstallScriptsForRootPackage}
+        ${runInstallScriptsForRootPackage {}}
         ${lib.concatStringsSep "\n" buildCommands}
         runHook postBuild
       '';
