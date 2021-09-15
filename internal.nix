@@ -56,17 +56,22 @@ rec {
   # Description: Takes a string of the format "git+http(s)://domain.tld/repo#commitish" and returns
   # an attribute set { url, commitish }
   # Type: String -> Set
-  parseGitRef = str:
+  parseGitRef =
     let
-      parts = builtins.split "[#]" str;
+      expression = "git\\+(https://[^#]+)#(.+)";
     in
-    assert !(builtins.length parts == 3) ->
-      builtins.throw "[npmlock2nix] failed to parse Git reference `${str}`. Expected a string of format `git+http(s)://domain.tld/repo#branch`";
-    rec {
-      inherit parts;
-      url = builtins.replaceStrings [ "git+" ] [ "" ] (builtins.elemAt parts 0);
-      commitish = builtins.elemAt parts 2;
-    };
+    str:
+      assert builtins.typeOf str != "string" -> throw "parseGitRef expects a string that matches `${expression}`. Got `${builtins.typeOf str}` with value `${toString str}`";
+      let
+        m = builtins.match expression str;
+      in
+      assert m == null -> throw "parseGitRef must be called with a string of the format git+protocol://domain.tld/path#commitish but was called with `${str}`";
+      assert builtins.length != 2 -> throw "parseGitRef got a URL that didn't conform to our expression `${expression}` with two captures groups. Matched as: `${toString m}`";
+      {
+        url = builtins.elemAt m 0;
+        commitish = builtins.elemAt m 1;
+      }
+  ;
 
   # Description: Takes a string of the format "github:org/repo#revision" and returns
   # an attribute set { org, repo, rev }
@@ -277,13 +282,13 @@ rec {
       # if either are missing
       content = builtins.fromJSON (builtins.readFile file);
       patchDep = (name: version:
-        # If the dependency is of the form github:owner/repo#branch the package-lock.json contains the specific
-        # revision that the branch was pointing at at the time of npm install.
+        # If the dependency is of the form github:owner/repo#branch or git+https://url#branch the package-lock.json
+        # contains the specific revision that the branch was pointing at at the time of npm install.
         # The package.json itself does not contain enough information to resolve a specific dependency,
         # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
         # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
         # wildcard dependency, which will make npm look at the lockfile.
-        if lib.hasPrefix "git" version then
+        if lib.hasPrefix "github:" version || (builtins.match "git\\+(https://[^#]+)#(.+)" version) != null then
           "*"
         else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
