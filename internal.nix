@@ -128,12 +128,12 @@ rec {
   # Type: Fn -> String -> Set -> Path
   makeGitSource = name: dependency:
     assert !(dependency ? version) ->
-      builtins.throw "[npmlock2nix] `version` attribute missing from `${name}`";
+      throw "`version` attribute missing from `${name}`";
     let
       v = parseGitRef dependency.version;
       f = parseGitRef dependency.from;
     in
-    assert v.url != f.url -> throw "[npmlock2nix] version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
+    assert v.url != f.url -> throw "version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
     let
       src' = fetchGit {
         url = f.url;
