@@ -11,11 +11,13 @@ The `node_modules` function parses `package.json` and `package-lock.json` and ge
 The `node_modules` function takes an attribute set with the following attributes:
 
 - **src** *(mandatory)*: Path to the source containing `package.json` and `package-lock.json`
-- **packageJson** *(default `src+"/package.json"`)*: Path to `package.json`
-- **packageLockJson** *(default `src+"/package-lock.json")*: Path to `package-lock.json`
+- **packageJson** *(default *`src+"/package.json"`*)*: Path to `package.json`
+- **packageLockJson** *(default *`src+"/package-lock.json"`*)*: Path to `package-lock.json`
 - **buildInputs** *(default `[]`)*: Additional build dependencies
 - **githubSourceHashMap** *(default: `{}`)*: Dependency hashes for evaluation in restricted mode (See [Concepts](#concepts) for details).
 - **preInstallLinks** *(default: `{}`)*: Map of symlinks to create inside npm dependencies in the `node_modules` output (See [Concepts](#concepts) for details).
+- **pname** *(default: detect or error)*: Force package name. Default value is the lockfile `name` field, which can be empty, but `node_modules` calls `stdenv.mkDerivation`, which requires a pname.
+- **version** *(default: detect or `"0.0.0"`)*: Force derivation version. Default value is the lockfile `version` field, which can be empty.
 
 #### Notes
 - You may provide additional arguments accepted by `mkDerivation` all of which are going to be passed on.
