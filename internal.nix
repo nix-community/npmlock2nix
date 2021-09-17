@@ -61,12 +61,11 @@ rec {
       expression = "git\\+(https://[^#]+)#(.+)";
     in
     str:
-      assert builtins.typeOf str != "string" -> throw "parseGitRef expects a string that matches `${expression}`. Got `${builtins.typeOf str}` with value `${toString str}`";
+      assert builtins.typeOf str != "string" -> throw "parseGitRef expects a string. Got `${builtins.typeOf str}` with value `${toString str}`";
       let
         m = builtins.match expression str;
       in
-      assert m == null -> throw "parseGitRef must be called with a string of the format git+protocol://domain.tld/path#commitish but was called with `${str}`";
-      assert builtins.length != 2 -> throw "parseGitRef got a URL that didn't conform to our expression `${expression}` with two captures groups. Matched as: `${toString m}`";
+      assert m == null || builtins.length m != 2 -> throw "parseGitRef expects a string that matches `${expression}` but was called with `${str}`";
       {
         url = builtins.elemAt m 0;
         commitish = builtins.elemAt m 1;
