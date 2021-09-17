@@ -198,11 +198,13 @@ rec {
       dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
     else if dependency ? from && dependency ? version then
       if lib.hasPrefix "github:" dependency.version then
-      # matches github:tmcw/leftpad#db1442a0556c2b133627ffebf455a78a1ced64b9
+      # matches github:owner/repo#commitish
         makeGithubSource sourceHashFunc name dependency
-      else
-      # matches git+https://github.com/tmcw/leftpad#db1442a0556c2b133627ffebf455a78a1ced64b9
+      else if (builtins.tryEval (parseGitRef dependency.version)).success then
+      # matches git+https://url#commitish
         makeGitSource name dependency
+      else
+        throw "No matching case to parse dependency `${name}`."
     else if shouldUseVersionAsUrl dependency then
       makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
     else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
