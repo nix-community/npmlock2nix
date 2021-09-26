@@ -14,7 +14,7 @@ The `node_modules` function takes an attribute set with the following attributes
 - **packageJson** *(default `src+"/package.json"`)*: Path to `package.json`
 - **packageLockJson** *(default `src+"/package-lock.json"`)*: Path to `package-lock.json`
 - **nodejs** *(default `nixpkgs.nodejs`, which is the Active LTS version)*: Node.js derivation to use
-- **npmCmd** *(default `npm install --offline`)*: npm command to install dependencies
+- **installCommands** *(default `[ "npm install --offline --nodedir=${nodeSource nodejs}" ]`)*: List of commands to install dependencies.
 - **preInstallLinks** *(default `{}`)*: Map of symlinks to create inside npm dependencies in the `node_modules` output (See [Concepts](#concepts) for details).
 - **githubSourceHashMap** *(default `{}`)*: Dependency hashes for evaluation in restricted mode (See [Concepts](#concepts) for details).
 
