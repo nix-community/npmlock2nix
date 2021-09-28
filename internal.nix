@@ -67,7 +67,8 @@ rec {
             } else
           builtins.fetchGit {
             url = "https://github.com/${org}/${repo}";
-            inherit rev ref;
+            inherit rev;
+            allRefs = true;
           };
     in
     runCommand
