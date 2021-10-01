@@ -38,6 +38,8 @@ Since `npmlock2nix` is written entirely in Nix, there aren't any additional prer
 
 ### Installation
 
+#### Via niv
+
 The preferred way to provide _npmlock2nix_ to your project is via [niv][niv-url]:
 
 ```shell
@@ -61,6 +63,31 @@ in
 ```
 
 Assuming the setup above, you can import `nix/default.nix` which will yield a nixpkgs set containing _npmlock2nix_.
+
+### Via flakes
+
+```nix
+{
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs.npmlock2nix = {
+    url = "github:nix-community/npmlock2nix";
+    # Use the same nixpkgs
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+  inputs.flake-utils.url = "github:numtide/flake-utils";
+
+  outputs = { self
+  , nixpkgs
+  , npmlock2nix
+  , flake-utils
+  }: flake-utils.lib.eachDefaultSystem (system: {
+    # Here all of npmlock2nix' functions are available with:
+    # npmlock2nix.<function>.${system}
+  });
+}
+```
+
+See the following section for a list of functions available with `npmlock2nix.<function>.${system}`.
 
 ## Usage
 
