@@ -379,7 +379,7 @@ rec {
           runHook postBuild
         '';
         installPhase = ''
-          mkdir -p "$out"
+          mkdir "$out"
 
           if test -d node_modules; then
             if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
