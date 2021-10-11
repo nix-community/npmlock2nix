@@ -26,12 +26,12 @@ rec {
     "0" <= c && c <= "9" ||
     "a" <= c && c <= "z" ||
     "A" <= c && c <= "Z" ||
-    c == "+" || c == "-" || c == "." || c == "_" || c == "?" || c == "=";
+    c == "+" || c == "-" || c == "." || c == "_" || c == "=";
 
   # Description: Converts a npm package name to something that is compatible with nix
   # Type: String -> String
   makeValidDrvName = str:
-    lib.stringAsChars (c: if isValidDrvNameChar c then c else "?") str;
+    lib.stringAsChars (c: if isValidDrvNameChar c then c else "_") str;
 
   # Description: Takes a string of the format "github:org/repo#revision" and returns
   # an attribute set { org, repo, rev }

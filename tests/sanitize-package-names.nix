@@ -6,7 +6,7 @@ testLib.runTests (
   ({
     # Using only a-zA-Z0-9 and a few selected special chars is allowed.
     testIsValidDrvNameCharHappyPath = {
-      expr = i.isValidDrvNameChar "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-.?=";
+      expr = i.isValidDrvNameChar "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-.=";
       expected = true;
     };
 
@@ -18,7 +18,7 @@ testLib.runTests (
     #  expected: false
     #       got: true
     let
-      cases = [ "!" "%" "^" "/" "\\" "#" "*" "(" ")" "@" "\"" "'" ];
+      cases = [ "!" "%" "^" "/" "\\" "#" "*" "(" ")" "@" "\"" "'" "?" ];
       mkCase = case: { expr = i.isValidDrvNameChar case; expected = false; };
     in
     lib.mapAttrs' (key: value: lib.nameValuePair "testIsValidDrvNameCharRejects: \"${key}\"" value) (
@@ -29,8 +29,8 @@ testLib.runTests (
     # We map the test cases from a (input, output)-style attribute set into the test structure such that we will receive human-friendly error messages when the tests fail.
     let
       cases = {
-        "asdf-123.-?_" = "asdf-123.-?_";
-        "ABCDEF$!%^/\\#*()@-'" = "ABCDEF???????????-?";
+        "asdf-123.-_" = "asdf-123.-_";
+        "ABCDEF$!%^/\\#*()@-'?" = "ABCDEF___________-__";
       };
       mkCase = (input: expected: { inherit expected; expr = i.makeValidDrvName input; });
     in
