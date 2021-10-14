@@ -74,7 +74,9 @@ rec {
       name
       { } ''
       set +x
-      tar -C ${src} -czf $out ./
+      mkdir package
+      cp -R ${src}/. package
+      tar -czf $out package
     '';
 
   # Description: Turns a dependency with a from field of the format
