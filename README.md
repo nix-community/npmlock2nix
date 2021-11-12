@@ -41,7 +41,7 @@ Since `npmlock2nix` is written entirely in Nix, there aren't any additional prer
 The preferred way to provide _npmlock2nix_ to your project is via [niv][niv-url]:
 
 ```shell
-$ niv add Tweag/npmlock2nix
+$ niv add nix-community/npmlock2nix
 ```
 
 Assuming you are also tracking nixpkgs via niv, you can then provide _npmlock2nix_ to your project as a [nixpkgs overlay][overlay-link]
