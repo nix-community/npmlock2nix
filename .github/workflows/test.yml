@@ -16,6 +16,6 @@ jobs:
           signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
       - run: nix-shell --run "nixpkgs-fmt --check ."
       - name: Try latest stable Nix release
-        run:  nix-shell -Inixpkgs=nix -p nix --run ./test.sh
+        run:  nix-shell -I nixpkgs=nix -p nix --run ./test.sh
       - name: Try tests with nix 2.3
-        run:  nix-shell -Inixpkgs=nix -p nix_2_3 --run ./test.sh
+        run:  nix-shell -I nixpkgs=nix -p nix_2_3 --run ./test.sh
