@@ -15,4 +15,7 @@ jobs:
           name: npmlock2nix
           signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
       - run: nix-shell --run "nixpkgs-fmt --check ."
-      - run: ./test.sh
+      - name: Try latest stable Nix release
+        run:  nix-shell -Inixpkgs=nix -p nix --run ./test.sh
+      - name: Try tests with nix 2.3
+        run:  nix-shell -Inixpkgs=nix -p nix_2_3 --run ./test.sh

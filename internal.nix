@@ -2,6 +2,21 @@
 rec {
   default_nodejs = nodejs;
 
+
+  # builtins.fetchGit wrapper that ensures compatibility with Nix 2.3 and Nix 2.4
+  # Type: Attrset -> Path
+  fetchGitWrapped =
+    let
+      is24OrNewer = lib.versionAtLeast builtins.nixVersion "2.4";
+    in
+    if is24OrNewer then
+    # remove the now unsupported / insufficient `ref` paramter
+      args: builtins.fetchGit (builtins.removeAttrs args [ "ref" ])
+    else
+    # for 2.3 (and older?) we remove the unsupported `allRefs` parameter
+      args: builtins.fetchGit (builtins.removeAttrs args [ "allRefs" ])
+  ;
+
   # Description: Custom throw function that ensures our error messages have a common prefix.
   # Type: String -> Throw
   throw = str: builtins.throw "[npmlock2nix] ${str}";
@@ -65,9 +80,9 @@ rec {
               inherit rev;
               sha256 = hash; # FIXME: what if sha3?
             } else
-          builtins.fetchGit {
+          fetchGitWrapped {
             url = "https://github.com/${org}/${repo}";
-            inherit rev;
+            inherit rev ref;
             allRefs = true;
           };
     in

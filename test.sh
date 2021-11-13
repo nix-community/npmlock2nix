@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#!nix-shell -I nixpkgs=./nix -p nix -i bash
+#!nix-shell -I nixpkgs=./nix -i bash
 
 set -e
 
