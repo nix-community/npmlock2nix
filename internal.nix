@@ -134,10 +134,11 @@ rec {
     in
     assert v.url != f.url -> throw "version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
     let
-      src' = fetchGit {
+      src' = fetchGitWrapped {
         url = f.url;
         rev = v.commitish;
         ref = f.commitish;
+        allRefs = true;
       };
       src = buildTgz "${name}.tgz" src';
     in
