@@ -11,7 +11,7 @@ jobs:
     steps:
       # notice there is no checkout step
       - name: niv-updater-action
-        uses: knl/niv-updater-action@v9
+        uses: knl/niv-updater-action@v10
         with:
           # https://github.com/knl/niv-updater-action/issues/45
           niv_version: 'af958e8057f345ee1aca714c1247ef3ba1c15f5e'
