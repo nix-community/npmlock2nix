@@ -48,6 +48,30 @@ rec {
   makeValidDrvName = str:
     lib.stringAsChars (c: if isValidDrvNameChar c then c else "?") str;
 
+  # Description: Checks if a string looks like a valid git revision
+  # Type: String -> Boolean
+  isGitRev = str:
+    (builtins.match "[0-9a-f]{40}" str) != null;
+
+  # Description: Takes a string of the format "git+http(s)://domain.tld/repo#commitish" and returns
+  # an attribute set { url, commitish }
+  # Type: String -> Set
+  parseGitRef =
+    let
+      expression = "git\\+(https://[^#]+)#(.+)";
+    in
+    str:
+      assert builtins.typeOf str != "string" -> throw "parseGitRef expects a string. Got `${builtins.typeOf str}` with value `${toString str}`";
+      let
+        m = builtins.match expression str;
+      in
+      assert m == null || builtins.length m != 2 -> throw "parseGitRef expects a string that matches `${expression}` but was called with `${str}`";
+      {
+        url = builtins.elemAt m 0;
+        commitish = builtins.elemAt m 1;
+      }
+  ;
+
   # Description: Takes a string of the format "github:org/repo#revision" and returns
   # an attribute set { org, repo, rev }
   # Type: String -> Set
@@ -86,12 +110,42 @@ rec {
             allRefs = true;
           };
     in
+    buildTgz name src;
+
+  # Description: Takes a name and a directory and returns a .tgz of the directory as store path.
+  # Type: str -> Path -> Path
+  buildTgz = name: src:
     runCommand
       name
       { } ''
       set +x
       tar -C ${src} -czf $out ./
     '';
+
+  # Description: Turns a dependency with a from field of the format
+  # `git+http://domain.tld/repo#commitish` into a git fetcher.
+  # Type: Fn -> String -> Set -> Path
+  makeGitSource = name: dependency:
+    assert !(dependency ? version) ->
+      throw "`version` attribute missing from `${name}`";
+    let
+      v = parseGitRef dependency.version;
+      f = parseGitRef dependency.from;
+    in
+    assert v.url != f.url -> throw "version and from of `${name}` disagree on the url to fetch from: `${v.url}` vs `${f.url}`";
+    let
+      src' = fetchGitWrapped {
+        url = f.url;
+        rev = v.commitish;
+        ref = f.commitish;
+        allRefs = true;
+      };
+      src = buildTgz "${name}.tgz" src';
+    in
+    (builtins.removeAttrs dependency [ "from" ]) // {
+      resolved = "file://" + (toString src);
+      version = "file://" + (toString src);
+    };
 
   # Description: Turns a dependency with a from field of the format
   # `github:org/repo#revision` into a git fetcher. The fetcher can
@@ -108,10 +162,11 @@ rec {
     in
     assert v.org != f.org -> throw "version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
     assert v.repo != f.repo -> throw "version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
+    assert !isGitRev v.rev -> throw "version of `${name}` does not specify a valid git rev: `${v.rev}`";
     let
       src = buildTgzFromGitHub {
         name = "${name}.tgz";
-        ref = v.rev;
+        ref = f.rev;
         inherit (v) org repo rev;
         hash = sourceHashFunc { type = "github"; value = v; };
       };
@@ -143,7 +198,14 @@ rec {
     if dependency ? resolved && dependency ? integrity then
       dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
     else if dependency ? from && dependency ? version then
-      makeGithubSource sourceHashFunc name dependency
+      if lib.hasPrefix "github:" dependency.version then
+      # matches github:owner/repo#commitish
+        makeGithubSource sourceHashFunc name dependency
+      else if (builtins.tryEval (parseGitRef dependency.version)).success then
+      # matches git+https://url#commitish
+        makeGitSource name dependency
+      else
+        throw "No matching case to parse dependency `${name}`."
     else if shouldUseVersionAsUrl dependency then
       makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
     else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
@@ -214,7 +276,7 @@ rec {
       dependencies = lib.mapAttrs (patchDependency sourceHashFunc) content.dependencies;
     };
 
-  # Description: Rewrite all the `github:` references to store paths
+  # Description: Rewrite all the `github:` references to wildcards.
   # Type: Fn -> Path -> Set
   patchPackagefile = sourceHashFunc: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
@@ -224,8 +286,14 @@ rec {
       # if either are missing
       content = builtins.fromJSON (builtins.readFile file);
       patchDep = (name: version:
-        if lib.hasPrefix "github:" version then
-          "file://${stringToTgzPath sourceHashFunc name version}"
+        # If the dependency is of the form github:owner/repo#branch or git+https://url#branch the package-lock.json
+        # contains the specific revision that the branch was pointing at at the time of npm install.
+        # The package.json itself does not contain enough information to resolve a specific dependency,
+        # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
+        # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
+        # wildcard dependency, which will make npm look at the lockfile.
+        if lib.hasPrefix "github:" version || (builtins.match "git\\+(https://[^#]+)#(.+)" version) != null then
+          "*"
         else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
