@@ -34,20 +34,6 @@ rec {
       hash = dependency.integrity;
     };
 
-  # Description: Returns true if the given input character is allowed within a derviation name.
-  # Type: String -> Boolean
-  # Source: https://github.com/nixos/nix/blob/706777a4a8b13771221f9b0ef3e984a50562e82b/src/libstore/path.cc#L5-L17
-  isValidDrvNameChar = c:
-    "0" <= c && c <= "9" ||
-    "a" <= c && c <= "z" ||
-    "A" <= c && c <= "Z" ||
-    c == "+" || c == "-" || c == "." || c == "_" || c == "?" || c == "=";
-
-  # Description: Converts a npm package name to something that is compatible with nix
-  # Type: String -> String
-  makeValidDrvName = str:
-    lib.stringAsChars (c: if isValidDrvNameChar c then c else "?") str;
-
   # Description: Checks if a string looks like a valid git revision
   # Type: String -> Boolean
   isGitRev = str:
@@ -376,7 +362,7 @@ rec {
 
       in
       stdenv.mkDerivation ({
-        pname = makeValidDrvName lockfile.name;
+        pname = lib.strings.sanitizeDerivationName lockfile.name;
         version = lockfile.version or "0";
         inherit buildInputs preBuild postBuild;
         dontUnpack = true;
