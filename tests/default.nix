@@ -17,7 +17,6 @@ in
   patch-lockfile = callPackage ./patch-lockfile.nix { };
   patch-packagefile = callPackage ./patch-packagefile.nix { };
   read-lockfile = callPackage ./read-lockfile { };
-  sanitize-package-names = callPackage ./sanitize-package-names.nix { };
   shell = callPackage ./shell.nix { };
   source-hash-func = callPackage ./source-hash-func.nix { };
 }

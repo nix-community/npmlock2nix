@@ -232,4 +232,16 @@ testLib.makeIntegrationTests {
       ${libwebp}/bin/cwebp
     '';
   };
+
+  sanitizes-package-names = {
+    description = ''
+      packages sometimes use `@` or `/` in package names which has to be sanitized
+      to avoid nix errors with invalid store paths.
+    '';
+    shell = callPackage ../examples-projects/unsanitized-package-name/shell.nix { };
+    command = ''
+      node -e 'console.log("works")'
+    '';
+    expected = "works";
+  };
 }
