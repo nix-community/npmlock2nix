@@ -16,6 +16,21 @@ testLib.runTests {
     };
   };
 
+  testNodeModulesWithNoVersion = {
+    expr =
+      let
+        drv = npmlock2nix.node_modules {
+          src = ./examples-projects/no-version;
+        };
+      in
+      {
+        inherit (drv) version name;
+      };
+    expected = {
+      name = "no-version-0";
+      version = "0";
+    };
+  };
 
   testNodeModulesForEmptyDependenciesHasNodeModulesFolder = {
     expr =
