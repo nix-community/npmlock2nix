@@ -369,8 +369,8 @@ rec {
 
       in
       stdenv.mkDerivation ({
-        inherit (lockfile) version;
         pname = makeValidDrvName lockfile.name;
+        version = lockfile.version or "0";
         inherit buildInputs preBuild postBuild;
         dontUnpack = true;
 
