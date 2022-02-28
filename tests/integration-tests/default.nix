@@ -1,8 +1,16 @@
-{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC, python3 }:
+{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC, python3, nodejs-16_x }:
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
     shell = npmlock2nix.shell { src = ../examples-projects/single-dependency; };
+    command = ''
+      node -e 'console.log(require("leftpad")(123, 7));'
+    '';
+    expected = "0000123\n";
+  };
+  leftpadV2 = {
+    description = "Handle a v2 npm lock file";
+    shell = npmlock2nix.shell { src = ../examples-projects/single-dependency-v2; nodejs = nodejs-16_x; };
     command = ''
       node -e 'console.log(require("leftpad")(123, 7));'
     '';
