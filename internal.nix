@@ -210,6 +210,26 @@ rec {
       # - This needs to be done recursively for all `dependencies` in the lockfile (`patchDependenciesSources`)
     (spec // patchSource // patchRequiresSources // patchDependenciesSources);
 
+  # Description: Patches a single lockfile package (recursively) by replacing the resolved URL with a store path
+  # Type: Fn -> String -> Set -> Set
+  patchPackage = sourceHashFunc: name: spec:
+    assert (builtins.typeOf name != "string") ->
+      throw "Name of dependency ${toString name} must be a string";
+    assert (builtins.typeOf spec != "set") ->
+      throw "spec of dependency ${toString name} must be a set";
+    # The current package has an entry with an empty name so we ignore it
+    if name == "" then spec else
+    let
+      isBundled = spec ? bundled && spec.bundled == true;
+      hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
+      patchSource = lib.optionalAttrs (!isBundled) (makeSource sourceHashFunc name spec);
+      patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceHashFunc name spec.requires); };
+    in
+    # For our purposes we need a package with
+      # - `resolved` set to a path in the nix store (`patchSource`)
+      # - All `requires` entries of this package that are set to github URLs set to a path in the nix store (`patchRequiresSources`)
+    (spec // patchSource // patchRequiresSources);
+
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: Fn -> Path -> Set
   patchLockfile = sourceHashFunc: file:
@@ -218,6 +238,8 @@ rec {
     let content = readLockfile file; in
     content // {
       dependencies = lib.mapAttrs (patchDependency sourceHashFunc) content.dependencies;
+    } // lib.optionalAttrs (content ? packages) {
+      packages = lib.mapAttrs (patchPackage sourceHashFunc) content.packages;
     };
 
   # Description: Rewrite all the `github:` references to wildcards.
