@@ -1,4 +1,4 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub, jq }:
 rec {
   default_nodejs = nodejs;
 
@@ -41,12 +41,12 @@ rec {
     "0" <= c && c <= "9" ||
     "a" <= c && c <= "z" ||
     "A" <= c && c <= "Z" ||
-    c == "+" || c == "-" || c == "." || c == "_" || c == "?" || c == "=";
+    c == "+" || c == "-" || c == "." || c == "_" || c == "=";
 
   # Description: Converts a npm package name to something that is compatible with nix
   # Type: String -> String
   makeValidDrvName = str:
-    lib.stringAsChars (c: if isValidDrvNameChar c then c else "?") str;
+    lib.stringAsChars (c: if isValidDrvNameChar c then c else "-") str;
 
   # Description: Checks if a string looks like a valid git revision
   # Type: String -> Boolean
@@ -242,7 +242,9 @@ rec {
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
     in
-    content // { inherit devDependencies dependencies; };
+    content //
+      { inherit devDependencies dependencies; } //
+      { scripts = {}; }; # in function node_modules, ignore the install script for the root package
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
   # Type: Fn -> Path -> Derivation
@@ -318,6 +320,26 @@ rec {
     else
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
+  runInstallScriptsForRootPackage = { dontRun ? false }: ''
+    # https://docs.npmjs.com/cli/v7/using-npm/scripts#npm-install
+    allScripts=$(jq -r 'select(.scripts != null) | .scripts | keys[]' package.json)
+    runScripts=""
+    for script in preinstall install postinstall prepublish preprepare prepare postprepare; do
+      if ( echo "$allScripts" | grep "^$script$" >/dev/null ); then
+        runScripts+=" $script"
+      fi
+    done
+    if [ ! -z "$runScripts" ]; then
+      echo "install scripts for the root package:"
+      for script in $runScripts; do echo "  npm run $script"; done # make easier to copy-paste
+      if [[ "${toString dontRun}" == "0" ]]; then
+        for script in $runScripts; do npm run $script || break; done
+      else
+        echo "please run these scripts manually"
+      fi
+    fi
+  '';
+
   node_modules =
     { src
     , packageJson ? src + "/package.json"
@@ -366,6 +388,16 @@ rec {
 
               ${preInstallLinkCommands}
 
+              # patchShebangs will only patch executable files
+              if [[ "$(pwd)" != "/build" ]]; then # ignore the root package. bin entries only make sense for dependencies
+                jq -r 'select(.bin != null) | .bin | if type == "string" then . else values[] end' package.json | while read binTarget; do
+                  if [[ ! -x "$binTarget" ]]; then
+                    echo "make binary executable: $(pwd)/$binTarget"
+                    chmod +x "$binTarget" || exit 1 # on error, throw ELIFECYCLE
+                  fi
+                done
+              fi
+
               if grep -I -q -r '/bin/' .; then
                 source $TMP/preinstall-env
                 patchShebangs .
@@ -383,6 +415,7 @@ rec {
 
         nativeBuildInputs = nativeBuildInputs ++ [
           nodejs
+          jq
         ];
 
         propagatedBuildInputs = [
@@ -451,6 +484,7 @@ rec {
       shellHook = ''
         # FIXME: we should somehow register a GC root here in case of a symlink?
         ${add_node_modules_to_cwd nm node_modules_mode}
+        ${runInstallScriptsForRootPackage { dontRun = true; }}
       '' + shellHook;
       passthru = passthru // {
         node_modules = nm;
@@ -481,6 +515,7 @@ rec {
 
       buildPhase = ''
         runHook preBuild
+        ${runInstallScriptsForRootPackage {}}
         ${lib.concatStringsSep "\n" buildCommands}
         runHook postBuild
       '';
