@@ -253,7 +253,7 @@ rec {
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
   # Type: Fn -> Path -> Derivation
-  patchedLockfile = sourceHashFunc: file: writeText "packages-lock.json"
+  patchedLockfile = sourceHashFunc: file: writeText "package-lock.json"
     (builtins.toJSON (patchLockfile sourceHashFunc file));
 
   # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
