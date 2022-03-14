@@ -209,8 +209,8 @@ rec {
     };
 
   # Description: Rewrite all the `github:` references to wildcards.
-  # Type: Fn -> Path -> Set
-  patchPackagefile = sourceHashFunc: file:
+  # Type: Path -> Set
+  patchPackagefile = file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "file ${toString file} must be a path or string";
     let
@@ -233,10 +233,10 @@ rec {
     content // { inherit devDependencies dependencies; };
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
-  # Type: Fn -> Path -> Derivation
-  patchedPackagefile = sourceHashFunc: file: writeText "package.json"
+  # Type: Path -> Derivation
+  patchedPackagefile = file: writeText "package.json"
     (
-      builtins.toJSON (patchPackagefile sourceHashFunc file)
+      builtins.toJSON (patchPackagefile file)
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
@@ -389,7 +389,7 @@ rec {
 
         postPatch = ''
           ln -sf ${patchedLockfile (sourceHashFunc githubSourceHashMap) packageLockJson} package-lock.json
-          ln -sf ${patchedPackagefile (sourceHashFunc githubSourceHashMap) packageJson} package.json
+          ln -sf ${patchedPackagefile packageJson} package.json
         '';
 
         buildPhase = ''
