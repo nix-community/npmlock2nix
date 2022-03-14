@@ -90,8 +90,8 @@ rec {
   # `github:org/repo#revision` into a git fetcher. The fetcher can
   # receive a hash value by calling 'sourceHashFunc' if a source hash
   # map has been provided. Otherwise the function yields `null`.
-  # Type: Fn -> String -> Set -> Path
-  makeGithubSource = sourceHashFunc: name: dependency:
+  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Path
+  makeGithubSource = { sourceHashFunc, ... }: name: dependency:
     assert !(dependency ? version) ->
       builtins.throw "version` attribute missing from `${name}`";
     assert (lib.hasPrefix "github: " dependency.version) -> builtins.throw "invalid prefix for `version` field of `${name}` expected `github:`, got: `${dependency.version}`.";
@@ -128,8 +128,8 @@ rec {
     dependency ? version && dependency ? integrity && ! (dependency ? resolved) && looksLikeUrl dependency.version;
 
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
-  # Type: Fn -> String -> Set -> Derivation
-  makeSource = sourceHashFunc: name: dependency:
+  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Derivation
+  makeSource = sourceOptions: name: dependency:
     assert (builtins.typeOf name != "string") ->
       throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") ->
@@ -137,9 +137,9 @@ rec {
     if dependency ? resolved && dependency ? integrity then
       dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
     else if dependency ? from && dependency ? version then
-      makeGithubSource sourceHashFunc name dependency
+      makeGithubSource sourceOptions name dependency
     else if shouldUseVersionAsUrl dependency then
-      makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
+      makeSource sourceOptions name (dependency // { resolved = dependency.version; })
     else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
 
   # Description: Parses the lock file as json and returns an attribute set
@@ -158,7 +158,7 @@ rec {
 
   # Description: Turns a github string reference into a store path with a tgz of the reference
   # Type: Fn -> String -> String -> Path
-  stringToTgzPath = sourceHashFunc: name: str:
+  stringToTgzPath = { sourceHashFunc, ... }: name: str:
     let
       gitAttrs = parseGitHubRef str;
     in
@@ -170,17 +170,17 @@ rec {
     };
 
   # Description: Patch the `requires` attributes of a dependency spec to refer to paths in the store
-  # Type: Fn -> String -> Set -> Set
-  patchRequires = sourceHashFunc: name: requires:
+  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Set
+  patchRequires = sourceOptions: name: requires:
     let
-      patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath sourceHashFunc name version else version;
+      patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath sourceOptions name version else version;
     in
     lib.mapAttrs patchReq requires;
 
 
   # Description: Patches a single lockfile dependency (recursively) by replacing the resolved URL with a store path
-  # Type: Fn -> String -> Set -> Set
-  patchDependency = sourceHashFunc: name: spec:
+  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Set
+  patchDependency = sourceOptions: name: spec:
     assert (builtins.typeOf name != "string") ->
       throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf spec != "set") ->
@@ -188,9 +188,9 @@ rec {
     let
       isBundled = spec ? bundled && spec.bundled == true;
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
-      patchSource = lib.optionalAttrs (!isBundled) (makeSource sourceHashFunc name spec);
-      patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceHashFunc name spec.requires); };
-      patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (patchDependency sourceHashFunc) spec.dependencies; };
+      patchSource = lib.optionalAttrs (!isBundled) (makeSource sourceOptions name spec);
+      patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceOptions name spec.requires); };
+      patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (patchDependency sourceOptions) spec.dependencies; };
     in
     # For our purposes we need a dependency with
       # - `resolved` set to a path in the nix store (`patchSource`)
@@ -199,13 +199,13 @@ rec {
     (spec // patchSource // patchRequiresSources // patchDependenciesSources);
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
-  # Type: Fn -> Path -> Set
-  patchLockfile = sourceHashFunc: file:
+  # Type: { sourceHashFunc :: Fn } -> Path -> Set
+  patchLockfile = sourceOptions: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "file ${toString file} must be a path or string";
     let content = readLockfile file; in
     content // {
-      dependencies = lib.mapAttrs (patchDependency sourceHashFunc) content.dependencies;
+      dependencies = lib.mapAttrs (patchDependency sourceOptions) content.dependencies;
     };
 
   # Description: Rewrite all the `github:` references to wildcards.
@@ -240,9 +240,9 @@ rec {
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
-  # Type: Fn -> Path -> Derivation
-  patchedLockfile = sourceHashFunc: file: writeText "package-lock.json"
-    (builtins.toJSON (patchLockfile sourceHashFunc file));
+  # Type: { sourceHashFunc :: Fn } -> Path -> Derivation
+  patchedLockfile = sourceOptions: file: writeText "package-lock.json"
+    (builtins.toJSON (patchLockfile sourceOptions file));
 
   # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
   # Type: Derivation -> Derivation
@@ -328,6 +328,10 @@ rec {
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
 
+        sourceOptions = {
+          sourceHashFunc = sourceHashFunc githubSourceHashMap;
+        };
+
         preinstall_node_modules = writeTextFile {
           name = "prepare";
           destination = "/node_modules/.hooks/prepare";
@@ -388,7 +392,7 @@ rec {
         '';
 
         postPatch = ''
-          ln -sf ${patchedLockfile (sourceHashFunc githubSourceHashMap) packageLockJson} package-lock.json
+          ln -sf ${patchedLockfile sourceOptions packageLockJson} package-lock.json
           ln -sf ${patchedPackagefile packageJson} package.json
         '';
 

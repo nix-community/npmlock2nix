@@ -1,7 +1,7 @@
 { testLib, npmlock2nix }:
 let
   i = npmlock2nix.internal;
-  f = builtins.throw "Shouldn't be called";
+  f = { sourceHashFunc = builtins.throw "Shouldn't be called"; };
 in
 testLib.runTests {
   testMakeSourceRegular = {

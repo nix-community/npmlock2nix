@@ -10,7 +10,7 @@
   # Reads a given file (either drv, path or string) and returns it's sha256 hash
   hashFile = filename: builtins.hashString "sha256" (builtins.readFile filename);
 
-  noGithubHashes = (_: null);
+  noSourceOptions = { sourceHashFunc = _: null; };
 
   runTests = tests:
     let

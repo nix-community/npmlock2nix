@@ -1,13 +1,13 @@
 { npmlock2nix, testLib, lib }:
 let
-  inherit (testLib) noGithubHashes;
+  inherit (testLib) noSourceOptions;
 in
 testLib.runTests {
 
   testPatchDependencyHandlesGitHubRefsInRequires = {
     expr =
       let
-        libxmljsUrl = (npmlock2nix.internal.patchDependency noGithubHashes "test" {
+        libxmljsUrl = (npmlock2nix.internal.patchDependency noSourceOptions "test" {
           version = "github:tmcw/leftpad#db1442a0556c2b133627ffebf455a78a1ced64b9";
           from = "github:tmcw/leftpad#db1442a0556c2b133627ffebf455a78a1ced64b9";
           integrity = "sha512-8/UvHFG90J4O4QNRzb0jB5Ni1QuvuB7XFTLfDMQnCzAsFemF29VKnNGUESFFcSP/r5WWh/PMe0YRz90+3IqsUA==";
@@ -22,7 +22,7 @@ testLib.runTests {
   };
 
   testBundledDependenciesAreRetained = {
-    expr = npmlock2nix.internal.patchDependency noGithubHashes "test" {
+    expr = npmlock2nix.internal.patchDependency noSourceOptions "test" {
       bundled = true;
       integrity = "sha1-hrGk3k+s4YCsVFqD8VA1I9j+0RU=";
       something = "bar";
@@ -37,12 +37,12 @@ testLib.runTests {
   };
 
   testPatchLockfileWithoutDependencies = {
-    expr = (npmlock2nix.internal.patchLockfile noGithubHashes ./examples-projects/no-dependencies/package-lock.json).dependencies;
+    expr = (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/no-dependencies/package-lock.json).dependencies;
     expected = { };
   };
 
   testPatchDependencyDoesntDropAttributes = {
-    expr = npmlock2nix.internal.patchDependency noGithubHashes "test" {
+    expr = npmlock2nix.internal.patchDependency noSourceOptions "test" {
       a = 1;
       foo = "something";
       resolved = "https://examples.com/something.tgz";
@@ -59,7 +59,7 @@ testLib.runTests {
   };
 
   testPatchDependencyPatchesDependenciesRecursively = {
-    expr = npmlock2nix.internal.patchDependency noGithubHashes "test" {
+    expr = npmlock2nix.internal.patchDependency noSourceOptions "test" {
       a = 1;
       foo = "something";
       resolved = "https://examples.com/something.tgz";
@@ -85,7 +85,7 @@ testLib.runTests {
   testPatchLockfileTurnsUrlsIntoStorePaths = {
     expr =
       let
-        deps = (npmlock2nix.internal.patchLockfile noGithubHashes ./examples-projects/single-dependency/package-lock.json).dependencies;
+        deps = (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/single-dependency/package-lock.json).dependencies;
       in
       lib.count (dep: lib.hasPrefix "file:///nix/store/" dep.resolved) (lib.attrValues deps);
     expected = 1;
@@ -94,19 +94,19 @@ testLib.runTests {
   testPatchLockfileTurnsGitHubUrlsIntoStorePaths = {
     expr =
       let
-        leftpad = (npmlock2nix.internal.patchLockfile noGithubHashes ./examples-projects/github-dependency/package-lock.json).dependencies.leftpad;
+        leftpad = (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/github-dependency/package-lock.json).dependencies.leftpad;
       in
       lib.hasPrefix ("file://" + builtins.storeDir) leftpad.version;
     expected = true;
   };
 
   testConvertPatchedLockfileToJSON = {
-    expr = builtins.typeOf (builtins.toJSON (npmlock2nix.internal.patchLockfile noGithubHashes ./examples-projects/nested-dependencies/package-lock.json)) == "string";
+    expr = builtins.typeOf (builtins.toJSON (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/nested-dependencies/package-lock.json)) == "string";
     expected = true;
   };
 
   testPatchedLockFile = {
-    expr = testLib.hashFile (npmlock2nix.internal.patchedLockfile noGithubHashes ./examples-projects/nested-dependencies/package-lock.json);
+    expr = testLib.hashFile (npmlock2nix.internal.patchedLockfile noSourceOptions ./examples-projects/nested-dependencies/package-lock.json);
     expected = "980323c3a53d86ab6886f21882936cfe7c06ac633993f16431d79e3185084414";
   };
 
