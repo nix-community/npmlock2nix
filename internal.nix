@@ -308,13 +308,13 @@ rec {
   sourceHashFunc = githubSourceHashMap: spec:
     if spec.type == "github" then
       lib.attrByPath
-      [ spec.value.org spec.value.repo spec.value.rev ]
-      (
-        lib.traceSeq
-        "[npmlock2nix] warning: missing attr in githubSourceHashMap: ${spec.value.org}.${spec.value.repo}.${spec.value.rev}"
-        null
-      )
-      githubSourceHashMap
+        [ spec.value.org spec.value.repo spec.value.rev ]
+        (
+          lib.traceSeq
+            "[npmlock2nix] warning: missing attr in githubSourceHashMap: ${spec.value.org}.${spec.value.repo}.${spec.value.rev}"
+            null
+        )
+        githubSourceHashMap
     else
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
