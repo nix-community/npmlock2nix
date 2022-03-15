@@ -16,6 +16,7 @@ The `node_modules` function takes an attribute set with the following attributes
 - **nodejs** *(default `nixpkgs.nodejs`, which is the Active LTS version)*: Node.js derivation to use
 - **preInstallLinks** *(default `{}`)*: Map of symlinks to create inside npm dependencies in the `node_modules` output (See [Concepts](#concepts) for details).
 - **githubSourceHashMap** *(default `{}`)*: Dependency hashes for evaluation in restricted mode (See [Concepts](#concepts) for details).
+- **sourceAttrs** *(default `{}`)*: Derivation attributes to apply to sources, allowing patching (See [Concepts](#concepts) for details)
 
 #### Notes
 - You may provide additional arguments accepted by `mkDerivation` all of which are going to be passed on.
@@ -111,6 +112,35 @@ npmlock2nix.build {
   src = ./.;
   node_modules_attrs = {
     buildInputs = [ pkgs.zlib ];
+  };
+}
+```
+
+### Source derivation attributes
+
+`node_modules` takes a `sourceAttrs` argument, which allows you to modify the source derivations of individual npm packages you depend on, mainly useful for adding Nix-specific fixes to packages. This could be used for patching interpreter or paths, or to replace vendored binaries with ones provided by Nix.
+
+The `sourceAttrs` argument expects an attribute set mapping npm package names to a function describing the modifications of that package. Each function receives an attribute set as an argument containing either a `version` attribute if the version is known, or a `github = { org, repo, rev, ref }` attribute if the package is fetched from GitHub. These values can be used to decide what the result of the function should be. The result of this function is passed to a `mkDerivation` call running mainly the [patch phase](https://nixos.org/manual/nixpkgs/stable/#ssec-patch-phase), meaning that [most `mkDerivation` arguments](https://nixos.org/manual/nixpkgs/stable/#chap-stdenv) can be returned from it. Of particular interest are `patches` and `postPatch`, in which `patchShebangs` can be called. Note that `patchShebangs` can only patch shebangs to binaries accessible in the derivation, which you can extend with `buildInputs`. For convenience, the correct version of `nodejs` is always included in `buildInputs`.
+
+```nix
+npmlock2nix.node_modules {
+  sourceMods = {
+    # sourceInfo either contains:
+    # - A version attribute
+    # - A github = { org, repo, rev, ref } attribute for GitHub sources
+    package-name = sourceInfo: {
+      buildInputs = [ somePackage ];
+      patches = [ somePatch ];
+      postPatch = ''
+        some script
+      '';
+      # ...
+    }
+
+    # Example
+    node-pre-gyp = sourceInfo: {
+      postPatch = "patchShebangs bin";
+    };
   };
 }
 ```
