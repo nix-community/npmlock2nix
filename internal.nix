@@ -1,6 +1,8 @@
-{ nodejs, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ nodejs-14_x, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
 rec {
-  default_nodejs = nodejs;
+  # Versions >= 15 use npm >= 7, which uses npm lockfile version 2, which we don't support yet
+  # See the assertion in the node_modules function
+  default_nodejs = nodejs-14_x;
 
 
   # builtins.fetchGit wrapper that ensures compatibility with Nix 2.3 and Nix 2.4
@@ -318,6 +320,8 @@ rec {
     , passthru ? { }
     , ...
     }@args:
+      assert lib.versionAtLeast nodejs.version "15.0" ->
+        throw "npmlock2nix is called with nodejs version ${nodejs.version}, which is currently not supported, see https://github.com/nix-community/npmlock2nix/issues/153 for more information";
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
