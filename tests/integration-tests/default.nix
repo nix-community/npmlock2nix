@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, callPackage, libwebp, runCommandNoCC, python3 }:
+{ npmlock2nix, testLib, nodejs-16_x, callPackage, libwebp, runCommandNoCC, python3 }:
 testLib.makeIntegrationTests {
   leftpad = {
     description = "Require a node dependency inside the shell environment";
@@ -245,5 +245,45 @@ testLib.makeIntegrationTests {
     expected = ''
       works
     '';
+  };
+
+  npm7-old-lockfile = {
+    description = "NPM >= 7 isn't supported right now because it uses a newer lockfile version";
+    shell = npmlock2nix.shell {
+      src = ../examples-projects/single-dependency;
+      nodejs = nodejs-16_x;
+    };
+    evalFailure = true;
+    status = 1;
+    expected = "";
+    expected-stderr = [
+      {
+        contains = ''
+          npm WARN old lockfile The package-lock.json file was created with an old version of npm,
+          npm WARN old lockfile so supplemental metadata must be fetched from the registry.
+        '';
+      }
+      {
+        contains = ''
+          npm ERR! Error: EACCES: permission denied, open '/build/package-lock.json'
+        '';
+      }
+    ];
+  };
+
+  npm7-new-lockfile = {
+    description = "NPM >= 7 isn't supported right now because it uses a newer lockfile version";
+    shell = npmlock2nix.shell {
+      src = ../examples-projects/single-dependency-lockfilev2;
+      nodejs = nodejs-16_x;
+    };
+    evalFailure = true;
+    status = 1;
+    expected = "";
+    expected-stderr = {
+      contains = ''
+        npm ERR! request to https://registry.npmjs.org/leftpad/-/leftpad-0.0.1.tgz failed: cache mode is 'only-if-cached' but no cached response is available.
+      '';
+    };
   };
 }
