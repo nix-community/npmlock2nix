@@ -75,9 +75,15 @@ testLib.runTests {
   testNodeModulesAcceptsCustomNodejs = {
     expr = (npmlock2nix.node_modules {
       src = ./examples-projects/no-dependencies;
-      nodejs = "our-custom-nodejs-package";
+      nodejs = {
+        pname = "our-custom-nodejs-package";
+        version = "14.12.34";
+      };
     }).nodejs;
-    expected = "our-custom-nodejs-package";
+    expected = {
+      pname = "our-custom-nodejs-package";
+      version = "14.12.34";
+    };
   };
 
   testNodeModulesPropagatesNodejs =
