@@ -234,8 +234,8 @@ rec {
 
 
   # Description: Patches a single lockfile dependency (recursively) by replacing the resolved URL with a store path
-  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Set
-  patchDependency = sourceOptions: name: spec:
+  # Type: List String -> { sourceHashFunc :: Fn } -> String -> Set -> { result :: Set, integrityUpdates :: List { path, file } }
+  patchDependency = path: sourceOptions: name: spec:
     assert (builtins.typeOf name != "string") ->
       throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf spec != "set") ->
@@ -245,22 +245,38 @@ rec {
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
       patchSource = lib.optionalAttrs (!isBundled) (makeSource sourceOptions name spec);
       patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceOptions name spec.requires); };
-      patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (patchDependency sourceOptions) spec.dependencies; };
-    in
-    # For our purposes we need a dependency with
+      nestedDependencies = lib.mapAttrs (name: patchDependency (path ++ [ name ]) sourceOptions name) spec.dependencies;
+      patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (_: value: value.result) nestedDependencies; };
+      nestedIntegrityUpdates = lib.concatMap (value: value.integrityUpdates) (lib.attrValues nestedDependencies);
+
+      # For our purposes we need a dependency with
       # - `resolved` set to a path in the nix store (`patchSource`)
       # - All `requires` entries of this dependency that are set to github URLs set to a path in the nix store (`patchRequiresSources`)
       # - This needs to be done recursively for all `dependencies` in the lockfile (`patchDependenciesSources`)
-    (spec // patchSource // patchRequiresSources // patchDependenciesSources);
+      result = spec // patchSource // patchRequiresSources // patchDependenciesSources;
+    in
+    {
+      result = result;
+      integrityUpdates = lib.optional (result ? resolved && result ? integrity && result.integrity == null) {
+        inherit path;
+        file = lib.removePrefix "file://" result.resolved;
+      };
+    };
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
-  # Type: { sourceHashFunc :: Fn } -> Path -> Set
+  # Type: { sourceHashFunc :: Fn } -> Path -> { result :: Set, integrityUpdates :: List { path, file } }
   patchLockfile = sourceOptions: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "file ${toString file} must be a path or string";
-    let content = readLockfile file; in
-    content // {
-      dependencies = lib.mapAttrs (patchDependency sourceOptions) content.dependencies;
+    let
+      content = readLockfile file;
+      dependencies = lib.mapAttrs (name: patchDependency [ name ] sourceOptions name) content.dependencies;
+    in
+    {
+      result = content // {
+        dependencies = lib.mapAttrs (_: value: value.result) dependencies;
+      };
+      integrityUpdates = lib.concatMap (value: value.integrityUpdates) (lib.attrValues dependencies);
     };
 
   # Description: Rewrite all the `github:` references to wildcards.
@@ -295,9 +311,15 @@ rec {
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
-  # Type: { sourceHashFunc :: Fn } -> Path -> Derivation
-  patchedLockfile = sourceOptions: file: writeText "package-lock.json"
-    (builtins.toJSON (patchLockfile sourceOptions file));
+  # Type: { sourceHashFunc :: Fn } -> Path -> { result :: Derivation, integrityUpdates :: List { path, file } }
+  patchedLockfile = sourceOptions: file:
+    let
+      patched = patchLockfile sourceOptions file;
+    in
+    {
+      result = writeText "package-lock.json" (builtins.toJSON patched.result);
+      integrityUpdates = patched.integrityUpdates;
+    };
 
   # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
   # Type: Derivation -> Derivation
@@ -389,7 +411,7 @@ rec {
           inherit nodejs sourceAttrs;
         };
 
-        patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
+        patchedLockfile' = patchedLockfile sourceOptions packageLockJson;
         patchedPackagefilePath = patchedPackagefile packageJson;
 
         preinstall_node_modules = writeTextFile {
@@ -437,6 +459,7 @@ rec {
 
         nativeBuildInputs = nativeBuildInputs ++ [
           jq
+        ] ++ lib.optionals (patchedLockfile'.integrityUpdates != [ ]) [
           openssl
           nodejs
         ];
@@ -453,38 +476,6 @@ rec {
           export HOME=$(mktemp -d)
         '';
 
-        # A jq filter for finding dependencies with an integrity field of
-        # `null`, as set at evaluation time by `makeUrlSource`, in the
-        # package-lock.json file. The output format is a newline separated list
-        # of entries, where each entry contains a JSON object path of the
-        # integrity field and the corresponding resolved file path, separated
-        # by a tab, ready for shell consumption
-        jqFindNullIntegrity = ''
-          # Processes dependencies entries as { key, value } pairs
-          def process(prefix):
-            (prefix + [ .key ]) as $path | .value |
-            (
-              # If we have an integrity attribute that is null, output an entry
-              if has("integrity") and .integrity == null
-              then
-                [ ($path + ["integrity"] | @json)
-                , (.resolved | ltrimstr("file://"))
-                ]
-              else empty
-              end
-            ,
-              # Recurse into .dependencies, this won't be necessary for
-              # lockfile version 2
-              if has("dependencies")
-              then .dependencies | to_entries[] | process($path + ["dependencies"])
-              else empty
-              end
-            );
-          .dependencies | to_entries[] | process(["dependencies"])
-          # Does the newline/tab separated thing, nice for shell consumption
-          | @tsv
-        '';
-
         # A script for updating specific JSON paths (.path) with specific
         # values (.value), as given in a list of objects, of an $original[0]
         # JSON value
@@ -495,21 +486,27 @@ rec {
             )
         '';
 
-        passAsFile = [ "jqFindNullIntegrity" "jqSetIntegrity" ];
+        passAsFile = [ "jqSetIntegrity" ];
 
         postPatch = ''
           # Patches the lockfile at build time to replace the `"integrity":
           # null` entries as set by `makeUrlSource` at eval time.
-          jq -r -f "$jqFindNullIntegrityPath" ${patchedLockfilePath} | while IFS=$'\t' read jsonpath file; do
+          # integrityUpdates is a list of { file, path }
+          ${if patchedLockfile'.integrityUpdates == [] then ''
+            cp ${patchedLockfile'.result} package-lock.json
+          '' else ''
+            {
+              ${lib.concatMapStrings ({ file, path }: ''
+                # https://docs.npmjs.com/cli/v8/configuring-npm/package-lock-json#packages
+                # https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity#tools_for_generating_sri_hashes
+                hash="sha512-$(openssl dgst -sha512 -binary ${lib.escapeShellArg file} | openssl base64 -A)"
 
-            # https://docs.npmjs.com/cli/v8/configuring-npm/package-lock-json#packages
-            # https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity#tools_for_generating_sri_hashes
-            hash="sha512-$(openssl dgst -sha512 -binary "$file" | openssl base64 -A)"
-
-            # Constructs a simple { path, value } JSON of the given arguments
-            jq -c --argjson path "$jsonpath" --arg value "$hash" -n '$ARGS.named'
-
-          done | jq -s --slurpfile original ${patchedLockfilePath} -f "$jqSetIntegrityPath" > package-lock.json
+                # Constructs a simple { path, value } JSON of the given arguments
+                jq -c --argjson path ${lib.escapeShellArg (builtins.toJSON path)} --arg value "$hash" -n '$ARGS.named'
+              '') patchedLockfile'.integrityUpdates}
+            } | jq -s --slurpfile original ${patchedLockfile'.result} -f "$jqSetIntegrityPath" > package-lock.json
+            set +x
+          ''}
 
           ln -sf ${patchedPackagefilePath} package.json
         '';
@@ -540,7 +537,7 @@ rec {
 
         passthru = passthru // {
           inherit nodejs;
-          lockfile = patchedLockfilePath;
+          lockfile = patchedLockfile'.result;
           packagesfile = patchedPackagefilePath;
         };
       } // cleanArgs);
