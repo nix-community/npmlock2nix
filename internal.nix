@@ -26,10 +26,20 @@ rec {
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
   makeSourceAttrs = name: dependency:
-    assert !(dependency ? resolved) -> throw "Missing `resolved` attribute for dependency `${name}`.";
+    #assert !(dependency ? resolved) -> throw "Missing `resolved` attribute for dependency `${name}`.";
     assert !(dependency ? integrity) -> throw "Missing `integrity` attribute for dependency `${name}`.";
+    let
+      resolved =
+        if dependency ? resolved
+        then dependency.resolved
+        else
+          # resolved is missing -> use the default registry
+          # example: https://registry.npmjs.org/async-some/-/async-some-1.0.2.tgz
+          assert !(dependency ? version) -> throw "Missing `version` attribute for dependency `${name}`.";
+          "https://registry.npmjs.org/${name}/-/${name}-${dependency.version}.tgz";
+    in
     {
-      url = dependency.resolved;
+      url = resolved;
       # FIXME: for backwards compatibility we should probably set the
       #        `sha1`, `sha256`, `sha512` … attributes depending on the string
       #        content.
@@ -140,7 +150,13 @@ rec {
       makeGithubSource sourceHashFunc name dependency
     else if shouldUseVersionAsUrl dependency then
       makeSource sourceHashFunc name (dependency // { resolved = dependency.version; })
-    else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
+    else if dependency ? integrity then
+      # we have integrity, but resolved is missing -> use the default registry
+      dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
+    else throw ''
+      Failed to resolve dependency `${name}`.
+      The object I got looks like this: ${builtins.toJSON dependency}
+    '';
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
