@@ -2,8 +2,8 @@
 npmlock2nix.shell {
   src = ./.;
   node_modules_attrs = {
-    sourceAttrs = {
-      custom-hello-world = _: {
+    sourceOverrides = {
+      custom-hello-world = sourceInfo: drv: drv.overrideAttrs (old: {
         patches = builtins.toFile "custom-hello-world.patch" ''
           diff --git a/lib/index.js b/lib/index.js
           index 1f66513..64391a7 100644
@@ -19,7 +19,7 @@ npmlock2nix.shell {
              if (exclamation)
                helloWorldStr += '!';
         '';
-      };
+      });
     };
   };
 }

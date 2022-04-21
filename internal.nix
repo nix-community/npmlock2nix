@@ -79,41 +79,38 @@ rec {
             allRefs = true;
           };
 
-      attrs = {
-        pname = name;
-        version = ref;
-        src = src;
-      } // lib.optionalAttrs (sourceOptions ? sourceAttrs.${name})
-        (sourceOptions.sourceAttrs.${name} {
-          github = { inherit org repo rev ref; };
-        });
+      sourceInfo = {
+        github = { inherit org repo rev ref; };
+      };
+      drv = packTgz sourceOptions.nodejs name ref src;
     in
-    packTgz sourceOptions.nodejs attrs;
+    if sourceOptions ? sourceOverrides.${name}
+    then sourceOptions.sourceOverrides.${name} sourceInfo drv
+    else drv;
 
-  # Description: Packs a source directory into a .tgz tar archive, allowing the
-  # source to be modified using derivation attributes. If the source is an
-  # archive, it gets unpacked first.
-  # Type: Path -> Set -> Path
-  packTgz = nodejs: attrs@{ pname, version, src, ... }: stdenv.mkDerivation ({
+  # Description: Packs a source directory into a .tgz tar archive. If the
+  # source is an archive, it gets unpacked first.
+  # Type: Path -> String -> String -> Path -> Path
+  packTgz = nodejs: pname: version: src: stdenv.mkDerivation {
     name = "${pname}-${version}.tgz";
     phases = "unpackPhase patchPhase installPhase";
+    inherit src;
+    buildInputs = [
+      # Allows patchShebangs in postPatch to patch shebangs to nodejs
+      nodejs
+    ];
     installPhase = ''
       runHook preInstall
       tar -C . -czf $out ./
       runHook postInstall
     '';
-  } // attrs // {
-    buildInputs = attrs.buildInputs or [ ] ++ [
-      # Allows patchShebangs in postPatch to patch shebangs to nodejs
-      nodejs
-    ];
-  });
+  };
 
   # Description: Turns a dependency with a from field of the format
   # `github:org/repo#revision` into a git fetcher. The fetcher can
   # receive a hash value by calling 'sourceHashFunc' if a source hash
   # map has been provided. Otherwise the function yields `null`. Patches
-  # specified with sourceAttrs will be applied
+  # specified with sourceOverrides will be applied
   # Type: { sourceHashFunc :: Fn } -> String -> Set -> Path
   makeGithubSource = sourceOptions@{ sourceHashFunc, ... }: name: dependency:
     assert !(dependency ? version) ->
@@ -153,29 +150,26 @@ rec {
     dependency ? version && dependency ? integrity && ! (dependency ? resolved) && looksLikeUrl dependency.version;
 
   # Description: Replaces the `resolved` field of a dependency with a
-  # prefetched version from the Nix store. Patches specified with sourceAttrs
+  # prefetched version from the Nix store. Patches specified with sourceOverrides
   # will be applied, in which case the `integrity` attribute is set to `null`,
   # in order to be recomputer later
-  # Type: { sourceAttrs :: Fn, nodejs :: Package } -> String -> Set -> Set
-  makeUrlSource = { sourceAttrs ? { }, nodejs, ... }: name: dependency:
+  # Type: { sourceOverrides :: Fn, nodejs :: Package } -> String -> Set -> Set
+  makeUrlSource = { sourceOverrides ? { }, nodejs, ... }: name: dependency:
     let
       src = fetchurl (makeSourceAttrs name dependency);
-      attrs = {
-        pname = name;
-        version = dependency.version;
-        src = src;
-      } // sourceAttrs.${name} {
+      sourceInfo = {
         inherit (dependency) version;
       };
+      drv = packTgz nodejs name dependency.version src;
       tgz =
-        if sourceAttrs ? ${name}
+        if sourceOverrides ? ${name}
         # If we have modification to this source, unpack the tgz, apply the
         # patches and repack the tgz
-        then packTgz nodejs attrs
+        then sourceOverrides.${name} sourceInfo drv
         else src;
       resolved = "file://" + toString tgz;
     in
-    dependency // { inherit resolved; } // lib.optionalAttrs (sourceAttrs ? ${name}) {
+    dependency // { inherit resolved; } // lib.optionalAttrs (sourceOverrides ? ${name}) {
       # Integrity was tampered with due to the source attributes, so it needs
       # to be recalculated, which is done in the node_modules builder
       integrity = null;
@@ -393,7 +387,7 @@ rec {
     , preBuild ? ""
     , postBuild ? ""
     , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
-    , sourceAttrs ? { }
+    , sourceOverrides ? { }
     , githubSourceHashMap ? { }
     , passthru ? { }
     , ...
@@ -403,12 +397,12 @@ rec {
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "sourceAttrs" "githubSourceHashMap" ];
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "sourceOverrides" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
 
         sourceOptions = {
           sourceHashFunc = sourceHashFunc githubSourceHashMap;
-          inherit nodejs sourceAttrs;
+          inherit nodejs sourceOverrides;
         };
 
         patchedLockfile' = patchedLockfile sourceOptions packageLockJson;
