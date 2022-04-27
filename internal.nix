@@ -25,15 +25,67 @@ rec {
 
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
-  makeSourceAttrs = name: dependency:
+  makeSourceAttrs = { npmOptions ? { }, ... }: name: dependency:
     assert !(dependency ? resolved) -> throw "Missing `resolved` attribute for dependency `${name}`.";
     assert !(dependency ? integrity) -> throw "Missing `integrity` attribute for dependency `${name}`.";
+    let
+      # Parses an npm package name scope, see https://docs.npmjs.com/cli/v8/using-npm/scope
+      scopeMatch = builtins.match "@([^/]+)/[^/]+" name;
+      scope = if scopeMatch == null then null else lib.elemAt scopeMatch 0;
+
+      getAuth = uri:
+        let
+          # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L26-L30
+          hasAuth = regKey:
+            npmOptions ? "${regKey}:_authToken" ||
+            npmOptions ? "${regKey}:_auth";
+          regKeyGo = regKey:
+            # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L14
+            if regKey == "//" then null
+            # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L15-L18
+            else if hasAuth regKey then regKey
+            # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L20-L22
+            else
+              let m = builtins.match "(.*)(/[^/]+|/)" regKey; in
+              if lib.elemAt m 1 == "/" then regKeyGo (lib.elemAt m 0)
+              else regKeyGo (lib.elemAt m 0 + "/");
+          # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L8-L13
+          regKey =
+            let m = builtins.match "[^:]+:(.*)" uri; in
+            if m == null then null
+            else regKeyGo (lib.elemAt m 0);
+          registry =
+            if scope != null && npmOptions ? "${scope}:registry" then npmOptions."${scope}:registry"
+            else npmOptions.registry or null;
+          sameHost = a: b: true;
+          # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L80-L85
+        in
+        if regKey != null then {
+          token = npmOptions."${regKey}:_authToken" or null;
+          auth = npmOptions."${regKey}:_auth" or null;
+        } else if registry != null && uri != registry && sameHost uri registry then
+          getAuth registry
+        else {
+          token = null;
+          auth = null;
+        };
+      auth = getAuth dependency.resolved;
+      authorizationHeader =
+        # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/auth.js#L102-L105
+        # https://github.com/npm/cli/blob/v8.5.4/node_modules/npm-registry-fetch/lib/index.js#L230-L234
+        if auth.token != null then "Bearer ${auth.token}"
+        else if auth.auth != null then "Basic ${auth.auth}"
+        else null;
+      curlOpts = lib.optionalString (authorizationHeader != null)
+        "--header @${writeText "headers" "Authorization: ${authorizationHeader}"}";
+    in
     {
       url = dependency.resolved;
       # FIXME: for backwards compatibility we should probably set the
       #        `sha1`, `sha256`, `sha512` … attributes depending on the string
       #        content.
       hash = dependency.integrity;
+      inherit curlOpts;
     };
 
   # Description: Checks if a string looks like a valid git revision
@@ -135,7 +187,7 @@ rec {
     assert (builtins.typeOf dependency != "set") ->
       throw "Specification of dependency ${toString name} must be a set";
     if dependency ? resolved && dependency ? integrity then
-      dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs name dependency))); }
+      dependency // { resolved = "file://" + (toString (fetchurl (makeSourceAttrs sourceOptions name dependency))); }
     else if dependency ? from && dependency ? version then
       makeGithubSource sourceOptions name dependency
     else if shouldUseVersionAsUrl dependency then
@@ -310,6 +362,7 @@ rec {
     { src
     , packageJson ? src + "/package.json"
     , packageLockJson ? src + "/package-lock.json"
+    , npmrc ? src + "/.npmrc"
     , buildInputs ? [ ]
     , nativeBuildInputs ? [ ]
     , nodejs ? default_nodejs
@@ -328,7 +381,21 @@ rec {
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
 
+
         sourceOptions = {
+          npmOptions =
+            if builtins.pathExists npmrc
+            then
+              lib.listToAttrs
+                (lib.concatMap
+                  (line:
+                    let m = builtins.match "([^=]*)=(.*)" line; in
+                    if m == null
+                    then [ ]
+                    else [ (lib.nameValuePair (lib.elemAt m 0) (lib.elemAt m 1)) ]
+                  )
+                  (lib.splitString "\n" (lib.fileContents npmrc)))
+            else { };
           sourceHashFunc = sourceHashFunc githubSourceHashMap;
         };
 

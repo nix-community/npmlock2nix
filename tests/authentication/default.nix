@@ -7,9 +7,20 @@ nixosTest {
       enable = true;
       virtualHosts.localhost = {
         # TODO: Enable
-        # basicAuth.bob = "bobs-secret";
-        locations."= /hello.tgz".alias = runCommandNoCC "hello.tgz" { } ''
-          tar -C ${./hello} -czf "$out" .
+        locations."= /hello.tgz" = {
+          alias = runCommandNoCC "hello.tgz" { } ''
+            tar -C ${./hello} -czf "$out" .
+          '';
+          extraConfig = ''
+            auth_request /auth;
+          '';
+        };
+
+        locations."= /auth".extraConfig = ''
+          if ( $http_authorization = 'Bearer some-token' ) {
+              return 204;
+          }
+          return 401;
         '';
       };
 
