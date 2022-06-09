@@ -284,4 +284,13 @@ testLib.makeIntegrationTests {
       '';
     };
   };
+
+  source-patching = {
+    description = "Source patching works";
+    shell = callPackage ../examples-projects/source-patching/shell.nix { };
+    command = ''
+      node -e 'console.log(require("custom-hello-world")({}));'
+    '';
+    expected = "Hello Nix\n";
+  };
 }
