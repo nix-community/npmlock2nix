@@ -398,8 +398,6 @@ rec {
     , passthru ? { }
     , ...
     }@args:
-      assert lib.versionAtLeast nodejs.version "15.0" ->
-        throw "npmlock2nix is called with nodejs version ${nodejs.version}, which is currently not supported, see https://github.com/nix-community/npmlock2nix/issues/153 for more information";
       assert (builtins.typeOf preInstallLinks != "set") ->
         throw "`preInstallLinks` must be an attributeset of attributesets";
       let
