@@ -514,7 +514,7 @@ rec {
           runHook preBuild
           declare -pf > $TMP/preinstall-env
           export HOME=.
-          npm install --offline --nodedir=${nodeSource nodejs}
+          npm ci --offline --nodedir=${nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
           runHook postBuild
         '';
