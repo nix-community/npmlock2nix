@@ -95,11 +95,16 @@ rec {
     name = "${pname}-${version}.tgz";
     phases = "unpackPhase patchPhase installPhase";
     inherit src;
+    nativeBuildInputs = [ jq ];
     buildInputs = [
       # Allows patchShebangs in postPatch to patch shebangs to nodejs
       nodejs
     ];
     installPhase = ''
+      for bin in $(cat package.json | jq ".bin[]"); do
+        chmod 755 $bin
+        patchShebangs $bin
+      done
       runHook preInstall
       tar -C . -czf $out ./
       runHook postInstall
@@ -434,10 +439,6 @@ rec {
 
               ${preInstallLinkCommands}
 
-              if grep -I -q -r '/bin/' .; then
-                source $TMP/preinstall-env
-                patchShebangs .
-              fi
             '';
           executable = true;
         };
