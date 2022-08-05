@@ -275,7 +275,7 @@ rec {
 
   # Description: Rewrite all the `github:` references to wildcards.
   # Type: Path -> Set
-  patchPackagefile = file: preinstallScript:
+  patchPackagefile = file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "file ${toString file} must be a path or string";
     let
@@ -294,20 +294,14 @@ rec {
         else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
-      defaultScripts = if (content ? scripts) then content.scripts else { };
-      scripts = defaultScripts // {
-        preinstall = "${preinstallScript};" + (if (defaultScripts ? preinstall) then defaultScripts.preinstall else "");
-      };
     in
-    content // {
-      inherit scripts devDependencies dependencies;
-    };
+    content // { inherit devDependencies dependencies; };
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
   # Type: Path -> Derivation
-  patchedPackagefile = file: preinstallScript: writeText "package.json"
+  patchedPackagefile = file: writeText "package.json"
     (
-      builtins.toJSON (patchPackagefile file preinstallScript)
+      builtins.toJSON (patchPackagefile file)
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
@@ -410,10 +404,11 @@ rec {
         };
 
         patchedLockfile' = patchedLockfile sourceOptions packageLockJson;
-        patchedPackagefilePath = patchedPackagefile packageJson preinstall_node_modules;
+        patchedPackagefilePath = patchedPackagefile packageJson;
 
         preinstall_node_modules = writeTextFile {
           name = "prepare";
+          destination = "/node_modules/.hooks/prepare";
           text =
             let
               preInstallLinkCommands = lib.concatStringsSep "\n" (
@@ -510,10 +505,13 @@ rec {
 
         buildPhase = ''
           runHook preBuild
+          mkdir -p node_modules/.hooks
           declare -pf > $TMP/preinstall-env
+          ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
           export HOME=.
           npm ci --offline --nodedir=${nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
+          rm -rf node_modules/.hooks
           runHook postBuild
         '';
         installPhase = ''
