@@ -140,7 +140,9 @@ rec {
     {
       json =
         (builtins.removeAttrs dependency [ "from" ]) // {
-          version = "file://" + (toString src);
+          version = f.rev;
+          resolved = "file://" + (toString src);
+          integrity = null;
         };
       pkg = src;
     };
