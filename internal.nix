@@ -140,7 +140,7 @@ rec {
     {
       json =
         (builtins.removeAttrs dependency [ "from" ]) // {
-          version = f.rev;
+          version = "0.0." + (builtins.substring 0 16 (lib.replaceStrings [ "a" "b" "c" "d" "e" "f" ] [ "10" "11" "12" "13" "14" "15" ] f.rev));
           resolved = "file://" + (toString src);
           integrity = null;
         };
