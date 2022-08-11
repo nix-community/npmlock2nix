@@ -93,7 +93,7 @@ rec {
   # Type: Path -> String -> String -> Path -> Path
   packTgz = nodejs: pname: version: src: stdenv.mkDerivation (
     rec {
-      name = "${pname}-${version}.tgz";
+      name = lib.strings.sanitizeDerivationName "${pname}-${version}.tgz";
       id = "id_" + (builtins.replaceStrings [ "-" "." ] [ "_" "_" ] name);
 
       phases = "unpackPhase patchPhase installPhase";
