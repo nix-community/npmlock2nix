@@ -253,18 +253,10 @@ testLib.makeIntegrationTests {
       src = ../examples-projects/single-dependency;
       nodejs = nodejs-16_x;
     };
-    evalFailure = true;
-    status = 1;
-    expected = "";
-    # Would fail with
-    # npm WARN old lockfile The package-lock.json file was created with an old version of npm,
-    # npm WARN old lockfile so supplemental metadata must be fetched from the registry.
-    # npm ERR! Error: EACCES: permission denied, open '/build/package-lock.json'
-    expected-stderr = {
-      contains = ''
-        error: [npmlock2nix] npmlock2nix is called with nodejs version 16.13.0, which is currently not supported, see https://github.com/nix-community/npmlock2nix/issues/153 for more information
-      '';
-    };
+    command = ''
+      node -e 'console.log(require("leftpad")(123, 7));'
+    '';
+    expected = "0000123\n";
   };
 
   npm7-new-lockfile = {
@@ -273,16 +265,10 @@ testLib.makeIntegrationTests {
       src = ../examples-projects/single-dependency-lockfilev2;
       nodejs = nodejs-16_x;
     };
-    evalFailure = true;
-    status = 1;
-    expected = "";
-    # Would fail with
-    # npm ERR! request to https://registry.npmjs.org/leftpad/-/leftpad-0.0.1.tgz failed: cache mode is 'only-if-cached' but no cached response is available.
-    expected-stderr = {
-      contains = ''
-        error: [npmlock2nix] npmlock2nix is called with nodejs version 16.13.0, which is currently not supported, see https://github.com/nix-community/npmlock2nix/issues/153 for more information
-      '';
-    };
+    command = ''
+      node -e 'console.log(require("leftpad")(123, 7));'
+    '';
+    expected = "0000123\n";
   };
 
   source-patching = {
