@@ -270,10 +270,20 @@ rec {
     let
       content = readLockfile file;
       dependencies = lib.mapAttrs (name: patchDependency [ name ] sourceOptions name) content.dependencies;
+      packages = lib.mapAttrs
+        (name:
+          if lib.strings.hasPrefix "node_modules/" name then
+            (patchDependency [ name ] sourceOptions (lib.strings.removePrefix "node_modules/" name))
+          else value: {
+            result = value;
+          })
+        content.packages;
     in
     {
       result = content // {
         dependencies = lib.mapAttrs (_: value: value.result) dependencies;
+      } // lib.optionalAttrs (content ? packages) {
+        packages = lib.mapAttrs (_: value: value.result) packages;
       };
       integrityUpdates = lib.concatMap (value: value.integrityUpdates) (lib.attrValues dependencies);
     };
