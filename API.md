@@ -74,22 +74,7 @@ Please refer to [github-dependency](https://github.com/tweag/npmlock2nix/blob/ma
 
 ### preInstallLinks
 
-Sometimes you may want to augment or populate vendored dependencies in npm packages because they either aren't working or they cannot be fetched during the build phase. This can be achieved by passing a `preInstallLinks` attribute set to `node_modules`.
-
-If you wanted to patch the [cwebp-bin](https://www.npmjs.com/package/cwebp-bin) package to contain the `cwebp` binary from nixpkgs under `vendor/cwebp-bin` you would do so as follows:
-
-```nix
-npmlock2nix.node_modules {
-  src = ./.;
-  preInstallLinks = {
-    "cwebp-bin" = {
-      "vendor/cweb-bin" = "${pkgs.libwebp}/bin/cwebp"
-    };
-  };
-}
-```
-
-Please refer to [bin-wrapped-dep](https://github.com/tweag/npmlock2nix/blob/master/tests/examples-projects/bin-wrapped-dep/shell.nix) for a fully working example.
+`preInstallLinks` was removed. Use source derivation overrides `sourceOverrides`
 
 
 ### node_modules_mode
@@ -120,11 +105,17 @@ npmlock2nix.build {
 
 `node_modules` takes a `sourceOverrides` argument, which allows you to modify the source derivations of individual npm packages you depend on, mainly useful for adding Nix-specific fixes to packages. This could be used for patching interpreter or paths, or to replace vendored binaries with ones provided by Nix.
 
-The `sourceOverrides` argument expects an attribute set mapping npm package names to a function describing the modifications of that package. Each function receives an attribute set as a first argument, containing either a `version` attribute if the version is known, or a `github = { org, repo, rev, ref }` attribute if the package is fetched from GitHub. These values can be used to have different overrides depending on the version. The function receives another argument which is the derivation of the fetched source, which can be modified using `.overrideAttrs`. The fetched source mainly runs the [patch phase](https://nixos.org/manual/nixpkgs/stable/#ssec-patch-phase), so of particular interest are the `patches` and `postPatch` attributes, in which `patchShebangs` can be called. Note that `patchShebangs` can only patch shebangs to binaries accessible in the derivation, which you can extend with `buildInputs`. For convenience, the correct version of `nodejs` is always included in `buildInputs`.
+Npm packages binaries interpreter are automatically patched with environment shebangs when an entry exist for the npm package.
+
+To replace `preInstallLinks` functionality. Symlinked vendored binaries are compiled to be added on node modules installation using npm preinstall script, this is required since npm strip symlinks from package archive.
+
+The `sourceOverrides` argument expects an attribute set mapping npm package names to a function describing the modifications of that package. Each function receives an attribute set as a first argument, containing either a `version` attribute if the version is known, or a `github = { org, repo, rev, ref }` attribute if the package is fetched from GitHub. These values can be used to have different overrides depending on the version. The function receives another argument which is the derivation of the fetched source, which can be modified using `.overrideAttrs`. The fetched source mainly runs the [patch phase](https://nixos.org/manual/nixpkgs/stable/#ssec-patch-phase), so of particular interest are the `patches` and `postPatch` attributes, in which `patchShebangs` can be called.
+
+`sourceOverrides` comes with default override mechanism like patching all npm packages binaries dependencies with `buildRequirePatchShebangs` or patching individual npm package binaries with `packageRequirePatchShebangs`.
 
 ```nix
 npmlock2nix.node_modules {
-  sourceOverrides = {
+  sourceOverrides = with npmlock2nix.node_modules; {
     # sourceInfo either contains:
     # - A version attribute
     # - A github = { org, repo, rev, ref } attribute for GitHub sources
@@ -132,15 +123,26 @@ npmlock2nix.node_modules {
       buildInputs = [ somePackage ];
       patches = [ somePatch ];
       postPatch = ''
-        some script
+        mkdir -p vendor
+        ln -sf ${vendored_binary} ./vendor/vendored_binary
       '';
       # ...
     })
 
-    # Example
-    node-pre-gyp = sourceInfo: drv: drv.overrideAttrs (old: {
-      postPatch = "patchShebangs bin";
-    });
+    # Patch all npm packages
+    inherit buildRequirePatchShebangs
+
+    # Patch individual package
+    node-pre-gyp = packageRequirePatchShebangs
+
+    # Link vendored binaries
+    package-name = sourceInfo: drv: drv.overrideAttrs (old: {
+      postPatch = ''
+        mkdir -p vendor
+        ln -sf ${vendored_binary} ./vendor/vendored_binary
+      '';
+    })
+
   };
 }
 ```
