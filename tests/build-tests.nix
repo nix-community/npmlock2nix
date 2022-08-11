@@ -28,29 +28,37 @@ symlinkAttrs {
     '';
   };
 
-  node-modules-attributes-are-passed-through = npmlock2nix.build {
-    src = ./examples-projects/bin-wrapped-dep;
-    buildCommands = [
-      ''
-        readlink -f $(node -e "console.log(require('cwebp-bin'))") > actual
-        echo ${libwebp}/bin/cwebp > expected
-      ''
-    ];
-    installPhase = ''
-      cp actual $out
-    '';
+  node-modules-attributes-are-passed-through = npmlock2nix.build (
+    {
+      src = ./examples-projects/bin-wrapped-dep;
+      buildCommands = [
+        ''
+          readlink -f $(node -e "console.log(require('cwebp-bin'))") > actual
+          echo ${libwebp}/bin/cwebp > expected
+        ''
+      ];
+      installPhase = ''
+        cp actual $out
+      '';
 
-    doCheck = true;
-    checkPhase = ''
-      cmp actual expected || exit 1
-    '';
+      doCheck = true;
+      checkPhase = ''
+        cat actual expected >&2
+        cmp actual expected || exit 1
+      '';
 
-    node_modules_attrs = {
-      preInstallLinks = {
-        "cwebp-bin"."vendor/cwebp" = "${libwebp}/bin/cwebp";
+      node_modules_attrs = {
+        sourceOverrides = {
+          "cwebp-bin" = sourceInfo: drv: drv.overrideAttrs (old: {
+            postPatch = ''
+              mkdir -p vendor
+              ln -sf ${libwebp}/bin/cwebp vendor/cwebp
+            '';
+          });
+        };
       };
-    };
-  };
+    }
+  );
 
   passsing-buildInputs-doesnt-break-the-build = npmlock2nix.build {
     src = ./examples-projects/webpack-cli-project;
