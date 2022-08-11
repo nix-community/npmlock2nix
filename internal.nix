@@ -1,7 +1,5 @@
 { nodejs-14_x, jq, openssl, coreutils, stdenv, mkShell, lib, fetchurl, writeText, writeShellScript, runCommand, fetchFromGitHub }:
 rec {
-  # Versions >= 15 use npm >= 7, which uses npm lockfile version 2, which we don't support yet
-  # See the assertion in the node_modules function
   default_nodejs = nodejs-14_x;
 
   SENTINEL_VALUE = builtins.hashString "sha1" (toString ./.);
