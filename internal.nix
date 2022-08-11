@@ -287,8 +287,6 @@ rec {
   patchDependency = sourceOptions: name: spec:
     assert (builtins.typeOf name != "string") ->
       throw "Name of dependency ${toString name} must be a string";
-    assert (builtins.typeOf spec != "set") ->
-      throw "spec of dependency ${toString name} must be a set";
     let
       isBundled = spec ? bundled && spec.bundled == true;
       patchSource = if !isBundled then (makeSource sourceOptions name spec) else { json = { }; };
@@ -305,8 +303,11 @@ rec {
       # - This needs to be done recursively for all `dependencies` in the lockfile (`patchDependenciesSources`)
       result = spec // patchSource.json // patchRequiresSources // patchDependenciesSources;
     in
-    {
+    if builtins.typeOf spec == "set" then {
       inherit result deps;
+    } else {
+      result = spec;
+      deps = [ ];
     };
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
