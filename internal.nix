@@ -1,4 +1,4 @@
-{ nodejs-14_x, jq, openssl, coreutils, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ nodejs-14_x, jq, openssl, coreutils, stdenv, mkShell, lib, fetchurl, writeText, writeShellScript, runCommand, fetchFromGitHub }:
 rec {
   # Versions >= 15 use npm >= 7, which uses npm lockfile version 2, which we don't support yet
   # See the assertion in the node_modules function
@@ -92,6 +92,15 @@ rec {
   # source is an archive, it gets unpacked first.
   # Type: Path -> String -> String -> Path -> Path
   packTgz = nodejs: pname: version: src: stdenv.mkDerivation (
+    let
+      preInstallLinks = writeShellScript "preInstallLinks" ''
+        for link in "$(<preinstalled.links)"; do
+          if [ ! -z "$link" ]; then
+            ln -sf $link
+          fi
+        done
+      '';
+    in
     rec {
       name = lib.strings.sanitizeDerivationName "${pname}-${version}.tgz";
       id = "id_" + (builtins.replaceStrings [ "-" "." ] [ "_" "_" ] name);
@@ -103,6 +112,15 @@ rec {
       nativeBuildInputs = [ jq openssl ];
 
       installPhase = ''
+        function prepare_links_for_npm_preinstall() {
+          find . -type l -exec readlink -nf "{}" \; -exec echo " {}" \; -exec false {} \+ > preinstalled.links || {
+            cp -p ${preInstallLinks} npm-preinstall-links.sh
+            cat package.json | {
+              jq -r '.scripts.preinstall as $preinstall | .scripts.preinstall = "./npm-preinstall-links.sh;" + $preinstall'
+            } > package.json.tmp && mv package.json.tmp package.json
+          }
+        }
+
         function patch_node_package_bin() {
           for bin in $(cat package.json | jq -r '.bin | (.[]?, (select(.|type=="string")|.))'); do
             if [ -f $bin ]; then
@@ -112,6 +130,7 @@ rec {
           done
         }
 
+        prepare_links_for_npm_preinstall
         patch_node_package_bin
 
         runHook preInstall
@@ -431,16 +450,16 @@ rec {
     , nodejs ? default_nodejs
     , preBuild ? ""
     , postBuild ? ""
-    , preInstallLinks ? { } # set that describes which files should be linked in a specific packages folder
+    , preInstallLinks ? null
     , sourceOverrides ? { }
     , githubSourceHashMap ? { }
     , passthru ? { }
     , ...
     }@args:
-      assert (builtins.typeOf preInstallLinks != "set") ->
-        throw "`preInstallLinks` must be an attributeset of attributesets";
+      assert (preInstallLinks != null) ->
+        throw "`preInstallLinks` was removed use `sourceOverrides";
       let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "sourceOverrides" "githubSourceHashMap" ];
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
 
         sourceOptions = {
@@ -450,39 +469,6 @@ rec {
 
         patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
         patchedPackagefilePath = patchedPackagefile packageJson;
-
-        preinstall_node_modules = writeTextFile {
-          name = "prepare";
-          destination = "/node_modules/.hooks/prepare";
-          text =
-            let
-              preInstallLinkCommands = lib.concatStringsSep "\n" (
-                lib.mapAttrsToList
-                  (name: mappings: ''
-                    if [ "$npm_package_name" == "${name}" ]; then
-                    ${lib.concatStringsSep "\n"
-                      (lib.mapAttrsToList
-                          (to: from: ''
-                              dirname=$(dirname ${to})
-                              mkdir -p $dirname
-                              ln -s ${from} ${to}
-                            '')
-                          mappings
-                      )}
-                    fi
-                  '')
-                  preInstallLinks
-              );
-            in
-            ''
-              #! ${stdenv.shell}
-
-              ${preInstallLinkCommands}
-
-            '';
-          executable = true;
-        };
-
       in
       stdenv.mkDerivation ({
         pname = lib.strings.sanitizeDerivationName lockfile.name;
@@ -509,13 +495,9 @@ rec {
 
         buildPhase = ''
           runHook preBuild
-          mkdir -p node_modules/.hooks
-          declare -pf > $TMP/preinstall-env
-          ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
           export HOME=.
           npm ci --offline --nodedir=${nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
-          rm -rf node_modules/.hooks
           runHook postBuild
         '';
         installPhase = ''

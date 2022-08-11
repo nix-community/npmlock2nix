@@ -7,8 +7,13 @@ npmlock2nix.shell {
       libwebp # cwebp-bin
     ];
 
-    preInstallLinks = {
-      "cwebp-bin"."vendor/cwebp" = "${libwebp}/bin/cwebp";
+    sourceOverrides = {
+      "cwebp-bin" = sourceInfo: drv: drv.overrideAttrs (old: {
+        postPatch = ''
+          mkdir -p vendor
+          ln -sf ${libwebp}/bin/cwebp vendor/cwebp
+        '';
+      });
     };
   };
 }
