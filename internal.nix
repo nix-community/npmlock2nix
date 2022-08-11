@@ -130,7 +130,7 @@ rec {
     assert !isGitRev v.rev -> throw "version of `${name}` does not specify a valid git rev: `${v.rev}`";
     let
       src = buildTgzFromGitHub {
-        name = "${name}.tgz";
+        inherit name;
         ref = f.rev;
         inherit (v) org repo rev;
         hash = sourceHashFunc { type = "github"; value = v; };
