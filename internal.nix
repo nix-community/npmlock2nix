@@ -4,6 +4,7 @@ rec {
   # See the assertion in the node_modules function
   default_nodejs = nodejs-14_x;
 
+  SENTINEL_VALUE = builtins.hashString "sha1" (toString ./.);
 
   # builtins.fetchGit wrapper that ensures compatibility with Nix 2.3 and Nix 2.4
   # Type: Attrset -> Path
@@ -211,12 +212,14 @@ rec {
         inherit (dependency) version;
       };
       drv = packTgz nodejs name dependency.version src;
-      tgz =
-        if sourceOverrides ? ${name}
+      tgz = (
+        if sourceOverrides ? ${name} then
         # If we have modification to this source, unpack the tgz, apply the
         # patches and repack the tgz
-        then sourceOverrides.${name} sourceInfo drv
-        else src;
+          sourceOverrides.${name} sourceInfo drv
+        else
+          if sourceOverrides.buildRequirePatchShebangs or false == node_modules.buildRequirePatchShebangs then drv else src
+      );
     in
     {
       json = dependency // {
@@ -451,83 +454,87 @@ rec {
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
   node_modules =
-    { src
-    , packageJson ? src + "/package.json"
-    , packageLockJson ? src + "/package-lock.json"
-    , buildInputs ? [ ]
-    , nativeBuildInputs ? [ ]
-    , nodejs ? default_nodejs
-    , preBuild ? ""
-    , postBuild ? ""
-    , preInstallLinks ? null
-    , sourceOverrides ? { }
-    , githubSourceHashMap ? { }
-    , passthru ? { }
-    , ...
-    }@args:
-      assert (preInstallLinks != null) ->
-        throw "`preInstallLinks` was removed use `sourceOverrides";
-      let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
-        lockfile = readLockfile packageLockJson;
+    {
+      __functor = self: { src
+                        , packageJson ? src + "/package.json"
+                        , packageLockJson ? src + "/package-lock.json"
+                        , buildInputs ? [ ]
+                        , nativeBuildInputs ? [ ]
+                        , nodejs ? default_nodejs
+                        , preBuild ? ""
+                        , postBuild ? ""
+                        , preInstallLinks ? null
+                        , sourceOverrides ? { }
+                        , githubSourceHashMap ? { }
+                        , passthru ? { }
+                        , ...
+                        }@args:
+        assert (preInstallLinks != null) ->
+          throw "`preInstallLinks` was removed use `sourceOverrides";
+        let
+          cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
+          lockfile = readLockfile packageLockJson;
 
-        sourceOptions = {
-          sourceHashFunc = sourceHashFunc githubSourceHashMap;
-          inherit nodejs sourceOverrides;
-        };
+          sourceOptions = {
+            sourceHashFunc = sourceHashFunc githubSourceHashMap;
+            inherit nodejs sourceOverrides;
+          };
 
-        patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
-        patchedPackagefilePath = patchedPackagefile packageJson;
-      in
-      stdenv.mkDerivation ({
-        pname = lib.strings.sanitizeDerivationName lockfile.name;
-        version = lockfile.version or "0";
-        dontUnpack = true;
+          patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
+          patchedPackagefilePath = patchedPackagefile packageJson;
+        in
+        stdenv.mkDerivation ({
+          pname = lib.strings.sanitizeDerivationName lockfile.name;
+          version = lockfile.version or "0";
+          dontUnpack = true;
 
-        inherit nativeBuildInputs buildInputs preBuild postBuild;
-        propagatedBuildInputs = [
-          nodejs
-        ];
+          inherit nativeBuildInputs buildInputs preBuild postBuild;
+          propagatedBuildInputs = [
+            nodejs
+          ];
 
-        setupHooks = [
-          ./set-node-path.sh
-        ];
+          setupHooks = [
+            ./set-node-path.sh
+          ];
 
-        preConfigure = ''
-          export HOME=$(mktemp -d)
-        '';
+          preConfigure = ''
+            export HOME=$(mktemp -d)
+          '';
 
-        postPatch = ''
-          ln -sf ${patchedLockfilePath} package-lock.json
-          ln -sf ${patchedPackagefilePath} package.json
-        '';
+          postPatch = ''
+            ln -sf ${patchedLockfilePath} package-lock.json
+            ln -sf ${patchedPackagefilePath} package.json
+          '';
 
-        buildPhase = ''
-          runHook preBuild
-          export HOME=.
-          npm ci --offline --nodedir=${nodeSource nodejs}
-          test -d node_modules/.bin && patchShebangs node_modules/.bin
-          runHook postBuild
-        '';
-        installPhase = ''
-          mkdir "$out"
+          buildPhase = ''
+            runHook preBuild
+            export HOME=.
+            npm ci --offline --nodedir=${nodeSource nodejs}
+            test -d node_modules/.bin && patchShebangs node_modules/.bin
+            runHook postBuild
+          '';
+          installPhase = ''
+            mkdir "$out"
 
-          if test -d node_modules; then
-            if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
-              mv node_modules $out/
-              if test -d $out/node_modules/.bin; then
-                ln -s $out/node_modules/.bin $out/bin
+            if test -d node_modules; then
+              if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
+                mv node_modules $out/
+                if test -d $out/node_modules/.bin; then
+                  ln -s $out/node_modules/.bin $out/bin
+                fi
               fi
             fi
-          fi
-        '';
+          '';
 
-        passthru = passthru // {
-          inherit nodejs;
-          lockfile = patchedLockfilePath;
-          packagesfile = patchedPackagefilePath;
-        };
-      } // cleanArgs);
+          passthru = passthru // {
+            inherit nodejs;
+            lockfile = patchedLockfilePath;
+            packagesfile = patchedPackagefilePath;
+          };
+        } // cleanArgs);
+      packageRequirePatchShebangs = sourceInfo: drv: drv;
+      buildRequirePatchShebangs = SENTINEL_VALUE;
+    };
 
   shell =
     { src
