@@ -1,4 +1,4 @@
-{ nodejs-14_x, jq, openssl, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ nodejs-14_x, jq, openssl, coreutils, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
 rec {
   # Versions >= 15 use npm >= 7, which uses npm lockfile version 2, which we don't support yet
   # See the assertion in the node_modules function
@@ -99,18 +99,21 @@ rec {
       phases = "unpackPhase patchPhase installPhase";
 
       inherit src;
-      buildInputs = [
-        # Allows patchShebangs in postPatch to patch shebangs to nodejs
-        nodejs
-      ];
       outputs = [ "out" "hash" ];
       nativeBuildInputs = [ jq openssl ];
 
       installPhase = ''
-        for bin in $(cat package.json | jq ".bin[]"); do
-          chmod 755 $bin
-          patchShebangs $bin
-        done
+        function patch_node_package_bin() {
+          for bin in $(cat package.json | jq -r '.bin | (.[]?, (select(.|type=="string")|.))'); do
+            if [ -f $bin ]; then
+              chmod 755 $bin
+              sed --follow-symlinks -i 's,#![[:space:]]*/usr/bin/env ,#!${coreutils}/bin/env ,' $bin
+            fi
+          done
+        }
+
+        patch_node_package_bin
+
         runHook preInstall
         tar -C . -czf $out ./
         echo sha512-$(openssl dgst -sha512 -binary $out | openssl base64 -A) > $hash
@@ -484,9 +487,9 @@ rec {
       stdenv.mkDerivation ({
         pname = lib.strings.sanitizeDerivationName lockfile.name;
         version = lockfile.version or "0";
-        inherit nativeBuildInputs buildInputs preBuild postBuild;
         dontUnpack = true;
 
+        inherit nativeBuildInputs buildInputs preBuild postBuild;
         propagatedBuildInputs = [
           nodejs
         ];
