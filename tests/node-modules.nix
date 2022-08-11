@@ -123,6 +123,9 @@ testLib.runTests {
   testBuildsNativeExtensions =
     let
       drv = npmlock2nix.node_modules {
+        sourceOverrides = with npmlock2nix.node_modules; {
+          "node-pre-gyp" = packageRequirePatchShebangs;
+        };
         src = ./examples-projects/native-extensions;
         buildInputs = [ python3 ];
       };
