@@ -108,8 +108,17 @@ rec {
       phases = "unpackPhase patchPhase installPhase";
 
       inherit src;
+      sourceRoot = "package";
       outputs = [ "out" "hash" ];
       nativeBuildInputs = [ jq openssl ];
+
+      unpackPhase = ''
+        runHook preUnpack
+        mkdir -p ${sourceRoot}
+        [[ -d ${src} ]] && cp -RT --reflink=auto ${src} ${sourceRoot}
+        [[ -f ${src} ]] && tar --no-same-owner --strip-components=1 --warning=no-timestamp -xf ${src} -C ${sourceRoot}
+        runHook postUnpack
+      '';
 
       installPhase = ''
         function prepare_links_for_npm_preinstall() {
