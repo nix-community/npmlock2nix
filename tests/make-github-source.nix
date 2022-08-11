@@ -12,9 +12,9 @@ in
   testSimpleCase = {
     expr =
       let
-        version = (i.makeGithubSource noSourceOptions "leftpad" testDependency).version;
+        resolved = (i.makeGithubSource noSourceOptions "leftpad" testDependency).json.resolved;
       in
-      lib.hasPrefix "file:///nix/store" version;
+      lib.hasPrefix "file:///nix/store" resolved;
     expected = true;
   };
 
