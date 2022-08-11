@@ -137,8 +137,12 @@ rec {
         inherit sourceOptions;
       };
     in
-    (builtins.removeAttrs dependency [ "from" ]) // {
-      version = "file://" + (toString src);
+    {
+      json =
+        (builtins.removeAttrs dependency [ "from" ]) // {
+          version = "file://" + (toString src);
+        };
+      pkg = src;
     };
 
   # Description: Checks if the given string looks like a vila HTTP or HTTPS url
@@ -172,12 +176,16 @@ rec {
         # patches and repack the tgz
         then sourceOverrides.${name} sourceInfo drv
         else src;
-      resolved = "file://" + toString tgz;
     in
-    dependency // { inherit resolved; } // lib.optionalAttrs (sourceOverrides ? ${name}) {
-      # Integrity was tampered with due to the source attributes, so it needs
-      # to be recalculated, which is done in the node_modules builder
-      integrity = null;
+    {
+      json = dependency // {
+        resolved = "file://" + (toString tgz);
+      } // lib.optionalAttrs (tgz != src) {
+        # Integrity was tampered with due to the source attributes, so it needs
+        # to be recalculated, which is done in the node_modules builder
+        integrity = null;
+      };
+      pkg = tgz;
     };
 
   # Description: Turns an npm lockfile dependency into a fetchurl derivation
@@ -241,8 +249,8 @@ rec {
       throw "spec of dependency ${toString name} must be a set";
     let
       isBundled = spec ? bundled && spec.bundled == true;
+      patchSource = if !isBundled then (makeSource sourceOptions name spec) else { json = { }; };
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
-      patchSource = lib.optionalAttrs (!isBundled) (makeSource sourceOptions name spec);
       patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceOptions name spec.requires); };
       nestedDependencies = lib.mapAttrs (name: patchDependency (path ++ [ name ]) sourceOptions name) spec.dependencies;
       patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (_: value: value.result) nestedDependencies; };
@@ -252,7 +260,7 @@ rec {
       # - `resolved` set to a path in the nix store (`patchSource`)
       # - All `requires` entries of this dependency that are set to github URLs set to a path in the nix store (`patchRequiresSources`)
       # - This needs to be done recursively for all `dependencies` in the lockfile (`patchDependenciesSources`)
-      result = spec // patchSource // patchRequiresSources // patchDependenciesSources;
+      result = spec // patchSource.json // patchRequiresSources // patchDependenciesSources;
     in
     {
       result = result;
