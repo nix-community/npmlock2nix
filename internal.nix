@@ -482,6 +482,8 @@ rec {
           patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
           patchedPackagefilePath = patchedPackagefile packageJson;
         in
+        assert lockfile.lockfileVersion == 2 && lib.versionOlder nodejs.version "15.0"
+          -> throw "npm lockfile V2 require nodejs version >= 15, it is not supported by nodejs ${nodejs.version}";
         stdenv.mkDerivation ({
           pname = lib.strings.sanitizeDerivationName lockfile.name;
           version = lockfile.version or "0";
