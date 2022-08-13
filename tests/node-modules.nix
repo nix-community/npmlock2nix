@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, runCommand, nodejs, python3 }:
+{ npmlock2nix, testLib, runCommand, nodejs, nodejs-16_x, python3 }:
 testLib.runTests {
   testNodeModulesForEmptyDependencies = {
     expr =
@@ -20,6 +20,7 @@ testLib.runTests {
     expr =
       let
         drv = npmlock2nix.node_modules {
+          nodejs = nodejs-16_x;
           src = ./examples-projects/no-version;
         };
       in
