@@ -123,14 +123,13 @@ rec {
         function prepare_links_for_npm_preinstall() {
           find . -type l -exec readlink -nf "{}" \; -exec echo " {}" \; -exec false {} \+ > preinstalled.links || {
             cp -p ${preInstallLinks} npm-preinstall-links.sh
-            cat package.json | {
-              jq -r '.scripts.preinstall as $preinstall | .scripts.preinstall = "./npm-preinstall-links.sh;" + $preinstall'
-            } > package.json.tmp && mv package.json.tmp package.json
+            jq -r '.scripts.preinstall as $preinstall | .scripts.preinstall = "./npm-preinstall-links.sh;" + $preinstall' \
+             package.json > package.json.tmp && mv package.json.tmp package.json
           }
         }
 
         function patch_node_package_bin() {
-          for bin in $(cat package.json | jq -r '.bin | (.[]?, (select(.|type=="string")|.))'); do
+          for bin in $(jq -r '.bin | (.[]?, (select(.|type=="string")|.))' package.json); do
             if [ -f $bin ]; then
               chmod 755 $bin
               sed --follow-symlinks -i 's,#![[:space:]]*/usr/bin/env ,#!${coreutils}/bin/env ,' $bin
