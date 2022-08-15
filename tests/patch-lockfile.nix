@@ -37,7 +37,7 @@ testLib.runTests {
   };
 
   testPatchLockfileWithoutDependencies = {
-    expr = (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/no-dependencies/package-lock.json).result.dependencies;
+    expr = (with npmlock2nix.internal; patchLockfile noSourceOptions (readPackageLikeFile ./examples-projects/no-dependencies/package-lock.json)).result.dependencies;
     expected = { };
   };
 
@@ -85,7 +85,7 @@ testLib.runTests {
   testPatchLockfileTurnsUrlsIntoStorePaths = {
     expr =
       let
-        deps = (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/single-dependency/package-lock.json).result.dependencies;
+        deps = (with npmlock2nix.internal; patchLockfile noSourceOptions (readPackageLikeFile ./examples-projects/single-dependency/package-lock.json)).result.dependencies;
       in
       lib.count (dep: lib.hasPrefix "file:///nix/store/" dep.resolved) (lib.attrValues deps);
     expected = 1;
@@ -94,19 +94,19 @@ testLib.runTests {
   testPatchLockfileTurnsGitHubUrlsIntoStorePaths = {
     expr =
       let
-        leftpad = (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/github-dependency/package-lock.json).result.dependencies.leftpad;
+        leftpad = (with npmlock2nix.internal; patchLockfile noSourceOptions (readPackageLikeFile ./examples-projects/github-dependency/package-lock.json)).result.dependencies.leftpad;
       in
       lib.hasPrefix ("file://" + builtins.storeDir) leftpad.resolved;
     expected = true;
   };
 
   testConvertPatchedLockfileToJSON = {
-    expr = builtins.typeOf (builtins.toJSON (npmlock2nix.internal.patchLockfile noSourceOptions ./examples-projects/nested-dependencies/package-lock.json)) == "string";
+    expr = builtins.typeOf (builtins.toJSON (with npmlock2nix.internal; patchLockfile noSourceOptions (readPackageLikeFile ./examples-projects/nested-dependencies/package-lock.json))) == "string";
     expected = true;
   };
 
   testPatchedLockFile = {
-    expr = testLib.hashFile (npmlock2nix.internal.patchedLockfile noSourceOptions ./examples-projects/nested-dependencies/package-lock.json);
+    expr = testLib.hashFile (with npmlock2nix.internal; patchedLockfile noSourceOptions (readPackageLikeFile ./examples-projects/nested-dependencies/package-lock.json));
     expected = "980323c3a53d86ab6886f21882936cfe7c06ac633993f16431d79e3185084414";
   };
 

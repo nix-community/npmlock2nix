@@ -5,7 +5,7 @@ in
 (testLib.runTests {
   testParsesSimpleLockfile =
     {
-      expr = i.readLockfile ./simple.json;
+      expr = i.readPackageLikeFile ./simple.json;
       expected = {
         name = "simple";
         version = "1.0.0";
@@ -25,7 +25,7 @@ in
   # always have at least an empty attribute set of dependencies.
   testParsesLockfileWithoutDependencies =
     {
-      expr = i.readLockfile ../examples-projects/no-dependencies/package-lock.json;
+      expr = i.readPackageLikeFile ../examples-projects/no-dependencies/package-lock.json;
       expected = {
         name = "no-dependencies";
         version = "1.0.0";
