@@ -279,4 +279,15 @@ testLib.makeIntegrationTests {
     '';
     expected = "Hello Nix\n";
   };
+
+  github-leftpad = {
+    description = "Test github source resolved";
+    shell = npmlock2nix.shell {
+      src = ../examples-projects/github-dependency;
+    };
+    command = ''
+      node -e 'console.log(require("leftpad")(123, 7));'
+    '';
+    expected = "0000123\n";
+  };
 }
