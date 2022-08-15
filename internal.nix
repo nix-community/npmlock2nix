@@ -246,7 +246,9 @@ rec {
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
-  readLockfile = file:
+  readPackageLikeFile = file:
+    assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
+      throw "file ${toString file} must be a path or string";
     let
       content = builtins.readFile file;
       json = builtins.fromJSON content;
@@ -335,11 +337,8 @@ rec {
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: { sourceHashFunc :: Fn } -> Path -> { result :: Set, integrityUpdates :: List { path, file } }
-  patchLockfile = sourceOptions: file:
-    assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
-      throw "file ${toString file} must be a path or string";
+  patchLockfile = sourceOptions: content:
     let
-      content = readLockfile file;
       dependencies = lib.mapAttrs (name: patchDependency sourceOptions name) content.dependencies;
       packages = lib.mapAttrs
         (name:
@@ -361,13 +360,8 @@ rec {
 
   # Description: Rewrite all the `github:` references to wildcards.
   # Type: Path -> Set
-  patchPackagefile = sourceOptions: file:
-    assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
-      throw "file ${toString file} must be a path or string";
+  patchPackagefile = sourceOptions: content:
     let
-      # Read the file but also add empty `devDependencies` and `dependencies`
-      # if either are missing
-      content = builtins.fromJSON (builtins.readFile file);
       patchDep = (name: version:
         # If the dependency is of the form github:owner/repo#branch the package-lock.json contains the specific
         # revision that the branch was pointing at at the time of npm install.
@@ -495,7 +489,8 @@ rec {
           throw "`preInstallLinks` was removed use `sourceOverrides";
         let
           cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
-          lockfile = readLockfile packageLockJson;
+          lockfile = readPackageLikeFile packageLockJson;
+          packagefile = readPackageLikeFile packageJson;
 
           sourceOptions = {
             sourceHashFunc = sourceHashFunc githubSourceHashMap;
@@ -503,8 +498,10 @@ rec {
             packagesVersions = mostRecentPackagesVersion lockfile.dependencies lockfile.packages or { };
           };
 
-          patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
-          patchedPackagefilePath = patchedPackagefile sourceOptions packageJson;
+          allDependenciesNames = builtins.attrNames (packagefile.dependencies // packagefile.devDependencies or { });
+
+          patchedLockfilePath = patchedLockfile sourceOptions lockfile;
+          patchedPackagefilePath = patchedPackagefile sourceOptions packagefile;
         in
         assert lockfile.lockfileVersion == 2 && lib.versionOlder nodejs.version "15.0"
           -> throw "npm lockfile V2 require nodejs version >= 15, it is not supported by nodejs ${nodejs.version}";
@@ -535,7 +532,7 @@ rec {
             runHook preBuild
             export HOME=.
             npm ci --offline --nodedir=${nodeSource nodejs} --ignore-scripts
-            npm rebuild --offline --nodedir=${nodeSource nodejs}
+            npm rebuild --offline --nodedir=${nodeSource nodejs} ${builtins.concatStringsSep " " allDependenciesNames}
             test -d node_modules/.bin && patchShebangs node_modules/.bin
             runHook postBuild
           '';
