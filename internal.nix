@@ -341,12 +341,11 @@ rec {
       throw "file ${toString file} must be a path or string";
     let
       content = readLockfile file;
-      packagesVersions = mostRecentPackagesVersion content.dependencies content.packages;
-      dependencies = lib.mapAttrs (name: patchDependency (sourceOptions // { inherit packagesVersions; }) name) content.dependencies;
+      dependencies = lib.mapAttrs (name: patchDependency sourceOptions name) content.dependencies;
       packages = lib.mapAttrs
         (name:
           if name != "" then
-            (patchDependency (sourceOptions // { inherit packagesVersions; }) name)
+            (patchDependency sourceOptions name)
           else value: {
             result = value;
           })
@@ -363,7 +362,7 @@ rec {
 
   # Description: Rewrite all the `github:` references to wildcards.
   # Type: Path -> Set
-  patchPackagefile = file:
+  patchPackagefile = sourceOptions: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
       throw "file ${toString file} must be a path or string";
     let
@@ -379,7 +378,7 @@ rec {
         # wildcard dependency, which will make npm look at the lockfile.
         if lib.hasPrefix "github:" version then
           "*"
-        else version);
+        else if version == "latest" then sourceOptions.packagesVersions.${name}.version else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
       devDependencies = if (content ? devDependencies) then lib.mapAttrs patchDep content.devDependencies else { };
     in
@@ -387,9 +386,9 @@ rec {
 
   # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
   # Type: Path -> Derivation
-  patchedPackagefile = file: writeText "package.json"
+  patchedPackagefile = sourceOptions: file: writeText "package.json"
     (
-      builtins.toJSON (patchPackagefile file)
+      builtins.toJSON (patchPackagefile sourceOptions file)
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
@@ -502,10 +501,11 @@ rec {
           sourceOptions = {
             sourceHashFunc = sourceHashFunc githubSourceHashMap;
             inherit nodejs sourceOverrides;
+            packagesVersions = mostRecentPackagesVersion lockfile.dependencies lockfile.packages or { };
           };
 
           patchedLockfilePath = patchedLockfile sourceOptions packageLockJson;
-          patchedPackagefilePath = patchedPackagefile packageJson;
+          patchedPackagefilePath = patchedPackagefile sourceOptions packageJson;
         in
         assert lockfile.lockfileVersion == 2 && lib.versionOlder nodejs.version "15.0"
           -> throw "npm lockfile V2 require nodejs version >= 15, it is not supported by nodejs ${nodejs.version}";
