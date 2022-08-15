@@ -284,10 +284,11 @@ rec {
 
   # Description: Patches a single lockfile dependency (recursively) by replacing the resolved URL with a store path
   # Type: { sourceHashFunc :: Fn } -> String -> Set -> { result :: Set, deps :: List }
-  patchDependency = sourceOptions: name: spec:
-    assert (builtins.typeOf name != "string") ->
-      throw "Name of dependency ${toString name} must be a string";
+  patchDependency = sourceOptions: raw_name: spec:
+    assert (builtins.typeOf raw_name != "string") ->
+      throw "Name of dependency ${toString raw_name} must be a string";
     let
+      name = genericPackageName raw_name;
       isBundled = spec ? bundled && spec.bundled == true;
       patchSource = if !isBundled then (makeSource sourceOptions name spec) else { json = { }; };
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
@@ -306,9 +307,32 @@ rec {
     if builtins.typeOf spec == "set" then {
       inherit result deps;
     } else {
-      result = spec;
+      result = if spec == "latest" then sourceOptions.packagesVersions.${name}.version else spec;
       deps = [ ];
     };
+
+  genericPackageName = name:
+    (lib.last (lib.strings.splitString "node_modules/" name));
+
+  mostRecentPackagesVersion = deps1: deps2:
+    let
+      base_deps = lib.mapAttrs' (name: value: { name = genericPackageName name; value = { version = value.version; }; }) deps1;
+    in
+    base_deps // (lib.mapAttrs'
+      (raw_name: value:
+        let
+          name = genericPackageName raw_name;
+          super = base_deps.${name} or { version = "0"; };
+        in
+        {
+          inherit name; value =
+          super // (
+            lib.optionalAttrs (builtins.compareVersions super.version value.version == -1)
+              { version = value.version; }
+          );
+        }
+      )
+      deps2);
 
   # Description: Takes a Path to a lockfile and returns the patched version as attribute set
   # Type: { sourceHashFunc :: Fn } -> Path -> { result :: Set, integrityUpdates :: List { path, file } }
@@ -317,11 +341,12 @@ rec {
       throw "file ${toString file} must be a path or string";
     let
       content = readLockfile file;
-      dependencies = lib.mapAttrs (name: patchDependency sourceOptions name) content.dependencies;
+      packagesVersions = mostRecentPackagesVersion content.dependencies content.packages;
+      dependencies = lib.mapAttrs (name: patchDependency (sourceOptions // { inherit packagesVersions; }) name) content.dependencies;
       packages = lib.mapAttrs
         (name:
-          if lib.strings.hasPrefix "node_modules/" name then
-            (patchDependency sourceOptions (lib.strings.removePrefix "node_modules/" name))
+          if name != "" then
+            (patchDependency (sourceOptions // { inherit packagesVersions; }) name)
           else value: {
             result = value;
           })
