@@ -535,7 +535,8 @@ rec {
           buildPhase = ''
             runHook preBuild
             export HOME=.
-            npm ci --offline --nodedir=${nodeSource nodejs}
+            npm ci --offline --nodedir=${nodeSource nodejs} --ignore-scripts
+            npm rebuild --offline --nodedir=${nodeSource nodejs}
             test -d node_modules/.bin && patchShebangs node_modules/.bin
             runHook postBuild
           '';
