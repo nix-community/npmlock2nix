@@ -19,5 +19,5 @@ let
 in
 {
   inherit v1 v2;
-  tests-v1 = pkgs.callPackage ./tests-v1 { };
+  tests = pkgs.callPackage ./tests { };
 } // (lib.mapAttrs (_: withWarning) v1)

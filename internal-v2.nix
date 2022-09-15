@@ -1,6 +1,6 @@
-{ nodejs-14_x, jq, openssl, coreutils, stdenv, mkShell, lib, fetchurl, writeText, writeShellScript, runCommand, fetchFromGitHub }:
+{ nodejs-16_x, jq, openssl, coreutils, stdenv, mkShell, lib, fetchurl, writeText, writeShellScript, runCommand, fetchFromGitHub }:
 rec {
-  default_nodejs = nodejs-14_x;
+  default_nodejs = nodejs-16_x;
 
   SENTINEL_VALUE = builtins.hashString "sha1" (toString ./.);
 
@@ -531,7 +531,9 @@ rec {
           buildPhase = ''
             runHook preBuild
             export HOME=.
-            npm ci --offline --nodedir=${nodeSource nodejs} --ignore-scripts
+            echo "${nodeSource nodejs}"
+            npm ci --nodedir=${nodeSource nodejs} --ignore-scripts
+            test -d node_modules/.bin && patchShebangs node_modules/.bin
             npm rebuild --offline --nodedir=${nodeSource nodejs} ${builtins.concatStringsSep " " allDependenciesNames}
             npm install --no-save --offline --nodedir=${nodeSource nodejs}
             test -d node_modules/.bin && patchShebangs node_modules/.bin
