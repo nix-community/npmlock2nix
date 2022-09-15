@@ -93,9 +93,15 @@ rec {
   packTgz = nodejs: pname: version: src: stdenv.mkDerivation (
     let
       preInstallLinks = writeShellScript "preInstallLinks" ''
+        # preinstalled.links is a space separated text file in the
+        # form of:
+        # $symlink-target $symlink-location
         for link in "$(<preinstalled.links)"; do
           if [ ! -z "$link" ]; then
-            ln -sf $link
+            target="$(echo "$link" | cut -d ' ' -f 1)"
+            location="$(echo "$link" | cut -d ' ' -f 2)"
+            mkdir -p "$(dirname "$location")"
+            ln -sf "$target" "$location"
           fi
         done
       '';
