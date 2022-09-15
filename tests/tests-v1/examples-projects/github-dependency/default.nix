@@ -1,4 +1,4 @@
-{ pkgs ? import ../../../nix { } }:
+{ pkgs ? import ../../../../nix { } }:
 
 pkgs.npmlock2nix.v1.node_modules {
   src = ./.;

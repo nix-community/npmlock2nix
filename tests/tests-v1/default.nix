@@ -1,10 +1,4 @@
-{ newScope }:
-let
-  callPackage = newScope testPkgs;
-  testPkgs = {
-    testLib = callPackage ./lib.nix { };
-  };
-in
+{ callPackage }:
 {
   build = callPackage ./build.nix { };
   build-tests = callPackage ./build-tests.nix { };
