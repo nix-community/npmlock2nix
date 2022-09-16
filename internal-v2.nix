@@ -40,21 +40,47 @@ rec {
   isGitRev = str:
     (builtins.match "[0-9a-f]{40}" str) != null;
 
-  # Description: Takes a string of the format "github:org/repo#revision" and returns
+  # Description: Takes a string of the format "git+ssh://git@github.com/owner/repo.git#revision", "git@github.com/owner/repo.git#revision" or github:owner/repo#revision and returns
   # an attribute set { org, repo, rev }
   # Type: String -> Set
   parseGitHubRef = str:
     let
       parts = builtins.split "[:#/]" str;
+      # Parse a string of the format "git+ssh://git@github.com/owner/repo.git#revision"
+      ghGitSshFormatParser = str:
+        let
+          repoWithGitSuffix = builtins.elemAt parts 10;
+        in
+        {
+          inherit parts;
+          org = builtins.elemAt parts 8;
+          repo = builtins.substring 0 ((builtins.stringLength repoWithGitSuffix) - 4) repoWithGitSuffix;
+          rev = builtins.elemAt parts 12;
+        };
+      # Parse a string of the format github:owner/repo#revision
+      ghShortnameParser = str: {
+        inherit parts;
+        org = builtins.elemAt parts 2;
+        repo = builtins.elemAt parts 4;
+        rev = builtins.elemAt parts 6;
+      };
+      # Parse a string of the format owner@github:owner/repo#revision
+      ghGitRefParser = str: {
+        inherit parts;
+        org = builtins.elemAt parts 2;
+        repo = builtins.elemAt parts 4;
+        rev = builtins.elemAt parts 6;
+      };
+      partLen = builtins.length parts;
     in
-    assert !(builtins.length parts == 7) ->
-      throw "failed to parse GitHub reference `${str}`. Expected a string of format `github:org/repo#revision`";
-    rec {
-      inherit parts;
-      org = builtins.elemAt parts 2;
-      repo = builtins.elemAt parts 4;
-      rev = builtins.elemAt parts 6;
-    };
+    assert !((partLen == 13) || (partLen == 7)) ->
+      throw "failed to parse GitHub reference `${str}`. Expected a string of format `git+ssh://git@github.org/owner/repo.git#revision or `github:owner/repo#revision`";
+    if (partLen == 13)
+    then ghGitSshFormatParser str
+    else
+      if (builtins.elemAt parts 0) == "github"
+      then ghShortnameParser str
+      else ghGitRefParser str;
 
   # Description: Takes an attribute set describing a git dependency and returns
   # a .tgz of the repository as store path. If the attribute hash contains a

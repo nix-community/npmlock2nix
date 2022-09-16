@@ -92,15 +92,14 @@ testLib.runTests {
     expected = 1;
   };
 
-  # TODO fix
-# testPatchLockfileTurnsGitHubUrlsIntoStorePaths = {
-#   expr =
-#     let
-#       leftpad = (i.patchLockfile noSourceOptions (i.readPackageLikeFile ./examples-projects/github-dependency/package-lock.json)).result.dependencies.leftpad;
-#     in
-#     lib.hasPrefix ("file://" + builtins.storeDir) leftpad.version;
-#   expected = true;
-# };
+  testPatchLockfileTurnsGitHubUrlsIntoStorePaths = {
+    expr =
+      let
+        leftpad = (i.patchLockfile noSourceOptions (i.readPackageLikeFile ./examples-projects/github-dependency/package-lock.json)).result.dependencies.leftpad;
+      in
+      lib.hasPrefix ("file://" + builtins.storeDir) leftpad.resolved;
+    expected = true;
+  };
 
   testConvertPatchedLockfileToJSON = {
     expr =
