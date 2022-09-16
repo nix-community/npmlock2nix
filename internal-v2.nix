@@ -369,13 +369,14 @@ rec {
   patchPackagefile = sourceOptions: content:
     let
       patchDep = (name: version:
-        # If the dependency is of the form github:owner/repo#branch the package-lock.json contains the specific
+        # If the dependency is of the form github:owner/repo#branch or
+        # http(s)://..., the package-lock.json contains the specific
         # revision that the branch was pointing at at the time of npm install.
         # The package.json itself does not contain enough information to resolve a specific dependency,
         # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
         # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
         # wildcard dependency, which will make npm look at the lockfile.
-        if lib.hasPrefix "github:" version then
+        if ((lib.hasPrefix "github:" version) || (lib.hasPrefix "http" version)) then
           "*"
         else if version == "latest" then sourceOptions.packagesVersions.${name}.version else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
