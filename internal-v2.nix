@@ -341,8 +341,8 @@ rec {
       )
       deps2);
 
-  # Description: Takes a Path to a lockfile and returns the patched version as attribute set
-  # Type: { sourceHashFunc :: Fn } -> Path -> { result :: Set, integrityUpdates :: List { path, file } }
+  # Description: Takes a parsed lockfile and returns the patched version as attribute set
+  # Type: { sourceHashFunc :: Fn } -> parsedLockedFile :: Set -> { result :: Set, integrityUpdates :: List { path, file } }
   patchLockfile = sourceOptions: content:
     let
       dependencies = lib.mapAttrs (name: patchDependency sourceOptions name) content.dependencies;
@@ -384,18 +384,18 @@ rec {
     in
     content // { inherit devDependencies dependencies; };
 
-  # Description: Takes a Path to a package file and returns the patched version as file in the Nix store
-  # Type: Path -> Derivation
-  patchedPackagefile = sourceOptions: file: writeText "package.json"
+  # Description: Takes a parsed package file and returns the patched version as file in the Nix store
+  # Type: { sourceHashFunc :: Fn } -> parsedPackageFile :: Set -> Derivation
+  patchedPackagefile = sourceOptions: parsedPackageFile: writeText "package.json"
     (
-      builtins.toJSON (patchPackagefile sourceOptions file)
+      builtins.toJSON (patchPackagefile sourceOptions parsedPackageFile)
     );
 
   # Description: Takes a Path to a lockfile and returns the patched version as file in the Nix store
-  # Type: { sourceHashFunc :: Fn } -> Path
-  patchedLockfile = sourceOptions: file:
+  # Type: { sourceHashFunc :: Fn } -> parsedLockFile :: Set -> Path
+  patchedLockfile = sourceOptions: parsedLockFile:
     let
-      patched = patchLockfile sourceOptions file;
+      patched = patchLockfile sourceOptions parsedLockFile;
       replacement = writeText "packages_hashes.sed" (lib.concatMapStrings
         (dep: lib.optionalString (dep ? id) ''
           s @${dep.id}@ ${lib.removeSuffix "\n" (builtins.readFile dep.hash)} g;
