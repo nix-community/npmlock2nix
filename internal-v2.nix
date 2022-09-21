@@ -22,27 +22,28 @@ rec {
   # Type: String -> Throw
   throw = str: builtins.throw "[npmlock2nix] ${str}";
 
-  # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
-  # Type: String -> Set -> Set
-  makeSourceAttrs = name: dependency:
-    assert !(dependency ? resolved) -> throw "Missing `resolved` attribute for dependency `${name}`.";
-    assert !(dependency ? integrity) -> throw "Missing `integrity` attribute for dependency `${name}`.";
-    {
-      url = dependency.resolved;
-      # FIXME: for backwards compatibility we should probably set the
-      #        `sha1`, `sha256`, `sha512` … attributes depending on the string
-      #        content.
-      hash = dependency.integrity;
-    };
-
-  # Description: Checks if a string looks like a valid git revision
+  # Description: Checks if a string looks like a valid github reference
   # Type: String -> Boolean
-  isGitRev = str:
-    (builtins.match "[0-9a-f]{40}" str) != null;
+  isGitHubRef = str:
+    let
+      parts = builtins.split "[:#/@]" str;
+      partsLen = builtins.length parts;
+    in
+    if partsLen == 7 || partsLen == 9 || partsLen == 15
+    then
+      (
+        ((builtins.elemAt parts 0) == "github") ||
+        ((builtins.elemAt parts 2) == "github.com") ||
+        ((builtins.elemAt parts 2) == "github") ||
+        ((builtins.elemAt parts 8) == "github.com")
+      )
+    else false;
 
-  # Description: Takes a string of the format "git+ssh://git@github.com/owner/repo.git#revision", "git@github.com/owner/repo.git#revision" or github:owner/repo#revision and returns
-  # an attribute set { org, repo, rev }
-  # Type: String -> Set
+  # Description: Takes a string of the format
+  # "git+ssh://git@github.com/owner/repo.git#revision",
+  # "git@github.com/owner/repo.git#revision" or
+  # github:owner/repo#revision and returns an attribute set.
+  # Type: String -> { org, repo, rev }
   parseGitHubRef = str:
     let
       parts = builtins.split "[:#/]" str;
@@ -86,7 +87,8 @@ rec {
   # a .tgz of the repository as store path. If the attribute hash contains a
   # hash attribute it will provide the value to `fetchFromGitHub` which will
   # also work in restricted evaluation.
-  # Type: Set -> Path
+  # Type: { name :: String , org :: String, repo :: String, rev :: String, ref :: String, hash :: String, sourceOptions :: Set }
+  #       -> drv
   buildTgzFromGitHub = { name, org, repo, rev, ref, hash ? null, sourceOptions ? { } }:
     let
       src =
@@ -143,6 +145,10 @@ rec {
       outputs = [ "out" "hash" ];
       nativeBuildInputs = [ jq openssl ];
 
+      propagatedBuildInputs = [
+        nodejs
+      ];
+
       unpackPhase = ''
         runHook preUnpack
         mkdir -p ${sourceRoot}
@@ -164,7 +170,7 @@ rec {
           for bin in $(jq -r '.bin | (.[]?, (select(.|type=="string")|.))' package.json); do
             if [ -f $bin ]; then
               chmod 755 $bin
-              sed --follow-symlinks -i 's,#![[:space:]]*/usr/bin/env ,#!${coreutils}/bin/env ,' $bin
+              patchShebangs $bin
             fi
           done
         }
@@ -180,101 +186,36 @@ rec {
     }
   );
 
-  # Description: Turns a dependency with a from field of the format
-  # `github:org/repo#revision` into a git fetcher. The fetcher can
-  # receive a hash value by calling 'sourceHashFunc' if a source hash
-  # map has been provided. Otherwise the function yields `null`. Patches
-  # specified with sourceOverrides will be applied
-  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Path
-  makeGithubSource = sourceOptions@{ sourceHashFunc, ... }: name: dependency:
-    assert !(dependency ? version) ->
-      builtins.throw "version` attribute missing from `${name}`";
-    assert (lib.hasPrefix "github: " dependency.version) -> builtins.throw "invalid prefix for `version` field of `${name}` expected `github:`, got: `${dependency.version}`.";
-    let
-      v = parseGitHubRef dependency.version;
-      f = parseGitHubRef dependency.from;
-    in
-    assert v.org != f.org -> throw "version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
-    assert v.repo != f.repo -> throw "version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
-    assert !isGitRev v.rev -> throw "version of `${name}` does not specify a valid git rev: `${v.rev}`";
-    let
-      src = buildTgzFromGitHub {
-        inherit name;
-        ref = f.rev;
-        inherit (v) org repo rev;
-        hash = sourceHashFunc { type = "github"; value = v; };
-        inherit sourceOptions;
-      };
-    in
-    {
-      json =
-        (builtins.removeAttrs dependency [ "from" ]) // {
-          version = "0.0." + (builtins.substring 0 16 (lib.replaceStrings [ "a" "b" "c" "d" "e" "f" ] [ "10" "11" "12" "13" "14" "15" ] f.rev));
-          resolved = "file://" + (toString src);
-          integrity = "@${src.id}@";
-        };
-      pkg = src;
-    };
-
-  # Description: Checks if the given string looks like a vila HTTP or HTTPS url
-  # Type: String -> Bool
-  looksLikeUrl = s:
-    assert (builtins.typeOf s != "string") -> throw "can only check strings if they are URL-like";
-    lib.hasPrefix "http://" s || lib.hasPrefix "https://" s;
-
-  # Description: Checks the given dependency spec if its version field should
-  # be used as URL in absence of a resolved attribute. In some cases the
-  # resolved field is missing but the version field contains a valid URL.
-  # Type: Set -> Bool
-  shouldUseVersionAsUrl = dependency:
-    dependency ? version && dependency ? integrity && ! (dependency ? resolved) && looksLikeUrl dependency.version;
-
   # Description: Replaces the `resolved` field of a dependency with a
   # prefetched version from the Nix store. Patches specified with sourceOverrides
   # will be applied, in which case the `integrity` attribute is set to `null`,
   # in order to be recomputer later
-  # Type: { sourceOverrides :: Fn, nodejs :: Package } -> String -> Set -> Set
-  makeUrlSource = { sourceOverrides ? { }, nodejs, ... }: name: dependency:
+  # Type: { sourceOverrides :: Fn, nodejs :: Package } -> String -> String -> String -> String -> { resolved :: Path, integrity :: String }
+  makeUrlSource = { sourceOverrides ? { }, nodejs, ... }: name: version: resolved: integrity:
     let
-      src = fetchurl (makeSourceAttrs name dependency);
+      src = fetchurl { url = resolved; hash = integrity; };
       sourceInfo = {
-        inherit (dependency) version;
+        version = version;
       };
-      drv = packTgz nodejs name dependency.version src;
+      drv =  (packTgz nodejs name version src);
       tgz = (
         if sourceOverrides ? ${name} then
         # If we have modification to this source, unpack the tgz, apply the
         # patches and repack the tgz
-          sourceOverrides.${name} sourceInfo drv
+        sourceOverrides.${name} sourceInfo drv
         else
-          if sourceOverrides.buildRequirePatchShebangs or false == node_modules.buildRequirePatchShebangs then drv else src
+        if sourceOverrides.buildRequirePatchShebangs or false == node_modules.buildRequirePatchShebangs then drv else src
       );
     in
     {
-      json = dependency // {
-        resolved = "file://" + (toString tgz);
-      } // lib.optionalAttrs (tgz != src) {
-        # Integrity was tampered with due to the source attributes, so it needs
-        # to be recalculated, which is done in the node_modules builder
-        integrity = "@${tgz.id}@";
-      };
-      pkg = tgz;
+      inherit integrity;
+      resolved = "file://" + (toString tgz);
+    } // lib.optionalAttrs (tgz != src) {
+      # Integrity was tampered with due to the source attributes, so it needs
+      # to be recalculated, which is done in the node_modules builder
+      integrity = null;
     };
 
-  # Description: Turns an npm lockfile dependency into a fetchurl derivation
-  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Derivation
-  makeSource = sourceOptions: name: dependency:
-    assert (builtins.typeOf name != "string") ->
-      throw "Name of dependency ${toString name} must be a string";
-    assert (builtins.typeOf dependency != "set") ->
-      throw "Specification of dependency ${toString name} must be a set";
-    if dependency ? resolved && dependency ? integrity then
-      makeUrlSource sourceOptions name dependency
-    else if dependency ? from && dependency ? version then
-      makeGithubSource sourceOptions name dependency
-    else if shouldUseVersionAsUrl dependency then
-      makeSource sourceOptions name (dependency // { resolved = dependency.version; })
-    else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
@@ -292,102 +233,60 @@ rec {
     # set. This makes the consuming code eaiser.
     if json ? dependencies then json else json // { dependencies = { }; };
 
-  # Description: Turns a github string reference into a store path with a tgz of the reference
-  # Type: Fn -> String -> String -> Path
-  stringToTgzPath = sourceOptions@{ sourceHashFunc, ... }: name: str:
-    let
-      gitAttrs = parseGitHubRef str;
-    in
-    buildTgzFromGitHub {
-      name = "${name}.tgz";
-      ref = gitAttrs.rev;
-      inherit (gitAttrs) org repo rev;
-      hash = sourceHashFunc { type = "github"; value = gitAttrs; };
-      inherit sourceOptions;
-    };
-
-  # Description: Patch the `requires` attributes of a dependency spec to refer to paths in the store
-  # Type: { sourceHashFunc :: Fn } -> String -> Set -> Set
-  patchRequires = sourceOptions: name: requires:
-    let
-      patchReq = name: version: if lib.hasPrefix "github:" version then stringToTgzPath sourceOptions name version else version;
-    in
-    lib.mapAttrs patchReq requires;
-
-
-  # Description: Patches a single lockfile dependency (recursively) by replacing the resolved URL with a store path
-  # Type: { sourceHashFunc :: Fn } -> String -> Set -> { result :: Set, deps :: List }
-  patchDependency = sourceOptions: raw_name: spec:
+  # Description: Patch a lockfile v2 package entry. It'll replace the
+  # URL stored in the integrity field with nix store path.
+  # spec :: {version :: String, resolved :: String, integrity :: String }.
+  # Type: { version :: String, resolved :: String, integrity :: String }
+  patchPackage = sourceOptions@{ sourceHashFunc, ... }: raw_name: spec:
     assert (builtins.typeOf raw_name != "string") ->
       throw "Name of dependency ${toString raw_name} must be a string";
+    assert !(spec ? resolved) ->
+      throw "Missing resolved field for dependency ${toString raw_name}";
+    assert !(spec ? version) ->
+      throw "Missing version field for dependency ${toString raw_name}";
     let
       name = genericPackageName raw_name;
-      isBundled = spec ? bundled && spec.bundled == true;
-      patchSource = if !isBundled then (makeSource sourceOptions name spec) else { json = { }; };
-      hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
-      patchRequiresSources = lib.optionalAttrs (hasGitHubRequires spec) { requires = (patchRequires sourceOptions name spec.requires); };
-      nestedDependencies = lib.mapAttrs (name: patchDependency sourceOptions name) spec.dependencies;
-      patchDependenciesSources = lib.optionalAttrs (spec ? dependencies) { dependencies = lib.mapAttrs (_: value: value.result) nestedDependencies; };
-      nestedDeps = lib.optionals (spec ? dependencies) (lib.concatMap (value: value.deps) (lib.attrValues nestedDependencies));
-      deps = [ patchSource.pkg ] ++ nestedDeps;
-
-      # For our purposes we need a dependency with
-      # - `resolved` set to a path in the nix store (`patchSource`)
-      # - All `requires` entries of this dependency that are set to github URLs set to a path in the nix store (`patchRequiresSources`)
-      # - This needs to be done recursively for all `dependencies` in the lockfile (`patchDependenciesSources`)
-      result = spec // patchSource.json // patchRequiresSources // patchDependenciesSources;
+      defaultedIntegrity = if spec ? integrity then spec.integrity else null;
+      patchedResolved =
+        if (!isGitHubRef spec.resolved)
+        then makeUrlSource sourceOptions name spec.version spec.resolved defaultedIntegrity
+        else
+          let
+            ghRef = parseGitHubRef spec.resolved;
+            ghTgz = buildTgzFromGitHub {
+              inherit name sourceOptions;
+              inherit (ghRef) org repo rev;
+              ref = ghRef.rev;
+              hash = sourceHashFunc { type = "github"; value = { inherit (ghRef) org repo rev; }; };
+            };
+          in
+          {
+            resolved = "file://" + (toString ghTgz);
+            integrity = null;
+          };
     in
-    if builtins.typeOf spec == "set" then {
-      inherit result deps;
-    } else {
-      result = if spec == "latest" then sourceOptions.packagesVersions.${name}.version else spec;
-      deps = [ ];
+    spec // {
+      inherit (patchedResolved) resolved integrity;
     };
 
   genericPackageName = name:
     (lib.last (lib.strings.splitString "node_modules/" name));
 
-  mostRecentPackagesVersion = deps1: deps2:
-    let
-      base_deps = lib.mapAttrs' (name: value: { name = genericPackageName name; value = { version = value.version; }; }) deps1;
-    in
-    base_deps // (lib.mapAttrs'
-      (raw_name: value:
-        let
-          name = genericPackageName raw_name;
-          super = base_deps.${name} or { version = "0"; };
-        in
-        {
-          inherit name; value =
-          super // (
-            lib.optionalAttrs (builtins.compareVersions super.version value.version == -1)
-              { version = value.version; }
-          );
-        }
-      )
-      deps2);
-
-  # Description: Takes a parsed lockfile and returns the patched version as attribute set
+  # Description: Takes a parsed lockfile and returns the patched version as an attribute set
   # Type: { sourceHashFunc :: Fn } -> parsedLockedFile :: Set -> { result :: Set, integrityUpdates :: List { path, file } }
   patchLockfile = sourceOptions: content:
     let
-      dependencies = lib.mapAttrs (name: patchDependency sourceOptions name) content.dependencies;
-      packages = lib.mapAttrs
-        (name:
-          if name != "" then
-            (patchDependency sourceOptions name)
-          else value: {
-            result = value;
-          })
-        content.packages;
+      contentWithoutDependencies = builtins.removeAttrs content [ "dependencies" ];
+      packagesWithoutSelf = lib.filterAttrs (n: v: n != "") content.packages;
+      topLevelPackage = lib.filterAttrs (n: v: n == "") content.packages;
+      patchedPackages = lib.mapAttrs (name: patchPackage sourceOptions name) packagesWithoutSelf;
     in
+        assert !(content ? packages) ->
+          throw "Missing the packages top-level key in your lockfile. Are you sure it is a npm lockfile v2?";
     {
-      result = content // {
-        dependencies = lib.mapAttrs (_: value: value.result) dependencies;
-      } // lib.optionalAttrs (content ? packages) {
-        packages = lib.mapAttrs (_: value: value.result) packages;
+      result = contentWithoutDependencies // {
+        packages = patchedPackages // topLevelPackage;
       };
-      deps = lib.concatMap (value: value.deps) (lib.attrValues dependencies);
     };
 
   # Description: Rewrite all the `github:` references to wildcards.
@@ -402,7 +301,7 @@ rec {
         # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
         # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
         # wildcard dependency, which will make npm look at the lockfile.
-        if ((lib.hasPrefix "github:" version) || (lib.hasPrefix "http" version)) then
+        if ((isGitHubRef version) || (lib.hasPrefix "http" version)) then
           "*"
         else if version == "latest" then sourceOptions.packagesVersions.${name}.version else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
@@ -422,23 +321,8 @@ rec {
   patchedLockfile = sourceOptions: parsedLockFile:
     let
       patched = patchLockfile sourceOptions parsedLockFile;
-      replacement = writeText "packages_hashes.sed" (lib.concatMapStrings
-        (dep: lib.optionalString (dep ? id) ''
-          s @${dep.id}@ ${lib.removeSuffix "\n" (builtins.readFile dep.hash)} g;
-        ''
-        )
-        patched.deps);
-      package-lock-json = writeText "package-lock.json" (builtins.toJSON patched.result);
     in
-    stdenv.mkDerivation ({
-      name = "package-lock.json";
-      phases = [ "patchPhase" ];
-
-      postPatch = ''
-        sed -f ${replacement} ${package-lock-json} > $out
-      '';
-    });
-
+      writeText "package-lock.json" (builtins.toJSON patched.result);
 
   # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
   # Type: Derivation -> Derivation
@@ -528,7 +412,7 @@ rec {
           sourceOptions = {
             sourceHashFunc = sourceHashFunc githubSourceHashMap;
             inherit nodejs sourceOverrides;
-            packagesVersions = mostRecentPackagesVersion lockfile.dependencies lockfile.packages or { };
+            packagesVersions = lockfile.packages or { };
           };
 
           allDependenciesNames = builtins.attrNames (packagefile.dependencies // packagefile.devDependencies or { });
@@ -564,7 +448,6 @@ rec {
           buildPhase = ''
             runHook preBuild
             export HOME=.
-            echo "${nodeSource nodejs}"
             npm ci --nodedir=${nodeSource nodejs} --ignore-scripts
             test -d node_modules/.bin && patchShebangs node_modules/.bin
             npm rebuild --offline --nodedir=${nodeSource nodejs} ${builtins.concatStringsSep " " allDependenciesNames}
@@ -574,7 +457,6 @@ rec {
           '';
           installPhase = ''
             mkdir "$out"
-
             if test -d node_modules; then
               if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
                 mv node_modules $out/
