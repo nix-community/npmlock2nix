@@ -33,4 +33,19 @@ in
         rev = "db1442a0556c2b133627ffebf455a78a1ced64b9";
       };
     };
+
+  testIsGitHubRefShort = {
+    expr = i.isGitHubRef "github:znerol/libxmljs#0517e063347ea2532c9fdf38dc47878c628bf0ae";
+    expected = true;
+  };
+
+  testIsGitHubRefFull = {
+    expr = i.isGitHubRef "git+ssh://git@github.com/znerol/libxmljs.git#0517e063347ea2532c9fdf38dc47878c628bf0ae";
+    expected = true;
+  };
+
+  testIsGitHubRefImplicitSsh = {
+    expr = i.isGitHubRef "git@github.com/znerol/libxmljs.git#0517e063347ea2532c9fdf38dc47878c628bf0ae";
+    expected = true;
+  };
 })
