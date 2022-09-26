@@ -173,6 +173,10 @@ rec {
               patchShebangs $bin
             fi
           done
+          if [[ -d node_modules ]]; then
+              # Patching shebangs of the bundled dependencies
+              patchShebangs node_modules
+          fi
         }
 
         prepare_links_for_npm_preinstall
