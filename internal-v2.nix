@@ -197,14 +197,14 @@ rec {
       sourceInfo = {
         version = version;
       };
-      drv =  (packTgz nodejs name version src);
+      drv = (packTgz nodejs name version src);
       tgz = (
         if sourceOverrides ? ${name} then
         # If we have modification to this source, unpack the tgz, apply the
         # patches and repack the tgz
-        sourceOverrides.${name} sourceInfo drv
+          sourceOverrides.${name} sourceInfo drv
         else
-        if sourceOverrides.buildRequirePatchShebangs or false == node_modules.buildRequirePatchShebangs then drv else src
+          if sourceOverrides.buildRequirePatchShebangs or false == node_modules.buildRequirePatchShebangs then drv else src
       );
     in
     {
@@ -281,8 +281,8 @@ rec {
       topLevelPackage = lib.filterAttrs (n: v: n == "") content.packages;
       patchedPackages = lib.mapAttrs (name: patchPackage sourceOptions name) packagesWithoutSelf;
     in
-        assert !(content ? packages) ->
-          throw "Missing the packages top-level key in your lockfile. Are you sure it is a npm lockfile v2?";
+    assert !(content ? packages) ->
+      throw "Missing the packages top-level key in your lockfile. Are you sure it is a npm lockfile v2?";
     {
       result = contentWithoutDependencies // {
         packages = patchedPackages // topLevelPackage;
@@ -322,7 +322,7 @@ rec {
     let
       patched = patchLockfile sourceOptions parsedLockFile;
     in
-      writeText "package-lock.json" (builtins.toJSON patched.result);
+    writeText "package-lock.json" (builtins.toJSON patched.result);
 
   # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
   # Type: Derivation -> Derivation
