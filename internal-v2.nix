@@ -39,6 +39,18 @@ rec {
       )
     else false;
 
+  # Description: Checks if a string looks like a valid github
+  # reference who do not have a rev. You shouldn't find any of those
+  # in a "resolved" field. It's however possible to find them in a
+  # "dependencies" part of a package.
+  # Type: String -> Boolean
+  isGitHubRefWithoutRev = str:
+    let
+      parts = builtins.split "[:#/@]" str;
+      partsLen = builtins.length parts;
+    in
+    partsLen == 5 && builtins.elemAt parts 0 == "github";
+
   # Description: Takes a string of the format
   # "git+ssh://git@github.com/owner/repo.git#revision",
   # "git@github.com/owner/repo.git#revision" or
@@ -251,6 +263,12 @@ rec {
     let
       name = genericPackageName raw_name;
       defaultedIntegrity = if spec ? integrity then spec.integrity else null;
+      # Relaxing dependencies version bounds: it could be a GitHub
+      # ref, forcing NPM to checkout the remote repo to get the actual
+      # version.
+      # We already pinned everything through the "resolved", we can
+      # relax those.
+      patchDependencies = deps: lib.mapAttrs (_n: dep: if isGitHubRef dep || isGitHubRefWithoutRev dep then "*" else dep) deps;
       patchedResolved =
         if (!isGitHubRef spec.resolved)
         then makeUrlSource sourceOptions name spec.version spec.resolved defaultedIntegrity
@@ -271,7 +289,7 @@ rec {
     in
     spec // {
       inherit (patchedResolved) resolved integrity;
-    };
+    } // lib.optionalAttrs (spec ? dependencies) { dependencies = (patchDependencies spec.dependencies); };
 
   genericPackageName = name:
     (lib.last (lib.strings.splitString "node_modules/" name));

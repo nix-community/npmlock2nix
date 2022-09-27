@@ -15,6 +15,14 @@ let
     resolved = "git+ssh://git@github.com/tmcw/leftpad.git#db1442a0556c2b133627ffebf455a78a1ced64b9";
     version = "0.0";
   };
+  specWithGhDependencies = {
+    resolved = "git+ssh://git@github.com/tmcw/leftpad.git#db1442a0556c2b133627ffebf455a78a1ced64b9";
+    version = "0.0";
+    dependencies = {
+      utf8 = "^2.1.1";
+      "bignumber.js" = "github:frozeman/bignumber.js-nolookahead";
+    };
+  };
 in
 (testLib.runTests {
   testGhSourceRef = {
@@ -50,8 +58,8 @@ in
           integrity = "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==";
         });
       in
-      res.version == "4.0.0" && lib.hasPrefix "file:///nix/store" res.resolved && res.integrity == "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==";
-    expected = true;
+      [ (res.version == "4.0.0") (lib.hasPrefix "file:///nix/store" res.resolved) (res.integrity == "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==") ];
+    expected = [ true true true ];
   };
   testPatchDepGithub = {
     expr =
@@ -63,9 +71,19 @@ in
           license = "BSD-3-Clause";
         });
       in
-      lib.hasPrefix "file:///nix/store" res.resolved && res.integrity == null;
-    expected = true;
+      [ (lib.hasPrefix "file:///nix/store" res.resolved) (res.integrity == null) ];
+    expected = [ true true ];
   };
-
-
+  testSpecWithGhDependencies = {
+    expr =
+      let
+        result = (i.patchPackage noSourceOptions "leftpad" specWithGhDependencies);
+      in
+      [
+        (lib.hasPrefix "file:///nix/store" result.resolved)
+        (result.dependencies.utf8 == "^2.1.1")
+        (result.dependencies."bignumber.js" == "*")
+      ];
+    expected = [ true true true ];
+  };
 })
