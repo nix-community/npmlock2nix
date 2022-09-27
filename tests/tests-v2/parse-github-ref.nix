@@ -48,4 +48,14 @@ in
     expr = i.isGitHubRef "git@github.com/znerol/libxmljs.git#0517e063347ea2532c9fdf38dc47878c628bf0ae";
     expected = true;
   };
+
+  testIsGitHubRefWithoutRef = {
+    expr = i.isGitHubRefWithoutRev "github:frozeman/bignumber.js-nolookahead";
+    expected = true;
+  };
+
+  testIsNotGitHubRefWithoutRef = {
+    expr = i.isGitHubRefWithoutRev "github:znerol/libxmljs#0517e063347ea2532c9fdf38dc47878c628bf0ae";
+    expected = false;
+  };
 })
