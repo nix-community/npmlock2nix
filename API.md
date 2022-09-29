@@ -2,6 +2,44 @@
 
 The sections below describe the public API of _npmlock2nix_.
 
+Npmlock2nix is currently in a transition phase. The npmlockfile format evolved with the npm v7 release so does the npmlock2nix parser. If you're trying to parse a lockfile v2, generated via npm >= 7, you'll have to use the `v2` top-level prefix.
+
+IE. you'll have to call the following functions with these prefixes:
+
+```nix
+# V1 lockfiles
+
+npmlock2nix.v1.build {
+…
+}
+
+npmlock2nix.v1.node_modules {
+…
+}
+
+npmlock2nix.v1.shell {
+…
+}
+
+# V2 lockfiles
+
+npmlock2nix.v2.build {
+…
+}
+
+npmlock2nix.v2.node_modules {
+…
+}
+
+npmlock2nix.v2.shell {
+…
+}
+```
+
+Aside from these `v1` and `v2` prefixes, the underlying public API stays the same.
+
+If you forget to specify a `v1`/`v2` prefix, a warning containing some migration instructions will be emitted and npmlock2nix will fall back on using the lockfiles `v1` parser.
+
 ## Functions
 
 ### node_modules
@@ -70,7 +108,7 @@ npmlock2nix.node_modules {
 }
 ```
 
-Please refer to [github-dependency](https://github.com/tweag/npmlock2nix/blob/master/tests/examples-projects/github-dependency/default.nix) for a fully working example.
+Please refer to [github-dependency](https://github.com/nix-community/npmlock2nix/blob/master/tests/tests-v2/examples-projects/github-dependency) for a fully working example.
 
 ### preInstallLinks
 
