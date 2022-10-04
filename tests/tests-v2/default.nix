@@ -2,7 +2,8 @@
 {
   build = callPackage ./build.nix { };
   build-tests = callPackage ./build-tests.nix { };
-  bundle-tests = callPackage ./examples-projects/bundled-dep-require-patch-shebang { };
+  in-bundle-dep-test = callPackage ./examples-projects/in-bundle-dependency { };
+  bundle-shebang-tests = callPackage ./examples-projects/bundled-dep-require-patch-shebang { };
   integration-tests = callPackage ./integration-tests { };
   patch-package = callPackage ./patch-package.nix { };
   make-url-source = callPackage ./make-url-source.nix { };

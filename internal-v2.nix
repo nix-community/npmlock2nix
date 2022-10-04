@@ -256,7 +256,7 @@ rec {
   patchPackage = sourceOptions@{ sourceHashFunc, ... }: raw_name: spec:
     assert (builtins.typeOf raw_name != "string") ->
       throw "Name of dependency ${toString raw_name} must be a string";
-    assert !(spec ? resolved) ->
+    assert !(spec ? resolved || (spec ? inBundle && spec.inBundle == true)) ->
       throw "Missing resolved field for dependency ${toString raw_name}";
     assert !(spec ? version) ->
       throw "Missing version field for dependency ${toString raw_name}";
@@ -287,9 +287,11 @@ rec {
             integrity = null;
           };
     in
-    spec // {
+    spec // lib.optionalAttrs (spec ? resolved) {
       inherit (patchedResolved) resolved integrity;
-    } // lib.optionalAttrs (spec ? dependencies) { dependencies = (patchDependencies spec.dependencies); };
+    } // lib.optionalAttrs (spec ? dependencies) {
+      dependencies = (patchDependencies spec.dependencies);
+    };
 
   genericPackageName = name:
     (lib.last (lib.strings.splitString "node_modules/" name));
