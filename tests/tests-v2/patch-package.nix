@@ -23,6 +23,15 @@ let
       "bignumber.js" = "github:frozeman/bignumber.js-nolookahead";
     };
   };
+  specWithPeerDependency = {
+    inherit (specRef) resolved version;
+    peerDependencies = {
+      "@babel/core" = "^7.11.5";
+      react = "^16.8.0 || ^17.0.0 || ^18.0.0";
+      react-dom = "^16.8.0 || ^17.0.0 || ^18.0.0";
+      require-from-string = "^2.0.2";
+    };
+  };
 in
 (testLib.runTests {
   testGhSourceRef = {
@@ -85,5 +94,13 @@ in
         (result.dependencies."bignumber.js" == "*")
       ];
     expected = [ true true true ];
+  };
+  testSpecWithPeerDependency = {
+    expr =
+      let
+        result = (i.patchPackage noSourceOptions "leftpad" specWithPeerDependency);
+      in
+      result ? peerDependencies;
+    expected = false;
   };
 })

@@ -287,7 +287,8 @@ rec {
             integrity = null;
           };
     in
-    spec // lib.optionalAttrs (spec ? resolved) {
+    (builtins.removeAttrs spec [ "peerDependencies" ]) //
+    lib.optionalAttrs (spec ? resolved) {
       inherit (patchedResolved) resolved integrity;
     } // lib.optionalAttrs (spec ? dependencies) {
       dependencies = (patchDependencies spec.dependencies);
