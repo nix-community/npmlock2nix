@@ -1,33 +1,14 @@
-{ nodejs-14_x, jq, openssl, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
+{ util, nodejs-14_x, jq, openssl, stdenv, mkShell, lib, fetchurl, writeText, writeTextFile, runCommand, fetchFromGitHub }:
 rec {
   # Versions >= 15 use npm >= 7, which uses npm lockfile version 2, which we don't support yet
   # See the assertion in the node_modules function
   default_nodejs = nodejs-14_x;
 
-
-  # builtins.fetchGit wrapper that ensures compatibility with Nix 2.3 and Nix 2.4
-  # Type: Attrset -> Path
-  fetchGitWrapped =
-    let
-      is24OrNewer = lib.versionAtLeast builtins.nixVersion "2.4";
-    in
-    if is24OrNewer then
-    # remove the now unsupported / insufficient `ref` paramter
-      args: builtins.fetchGit (builtins.removeAttrs args [ "ref" ])
-    else
-    # for 2.3 (and older?) we remove the unsupported `allRefs` parameter
-      args: builtins.fetchGit (builtins.removeAttrs args [ "allRefs" ])
-  ;
-
-  # Description: Custom throw function that ensures our error messages have a common prefix.
-  # Type: String -> Throw
-  throw = str: builtins.throw "[npmlock2nix] ${str}";
-
   # Description: Turns an npm lockfile dependency into an attribute set as needed by fetchurl
   # Type: String -> Set -> Set
   makeSourceAttrs = name: dependency:
-    assert !(dependency ? resolved) -> throw "Missing `resolved` attribute for dependency `${name}`.";
-    assert !(dependency ? integrity) -> throw "Missing `integrity` attribute for dependency `${name}`.";
+    assert !(dependency ? resolved) -> util.throw "Missing `resolved` attribute for dependency `${name}`.";
+    assert !(dependency ? integrity) -> util.throw "Missing `integrity` attribute for dependency `${name}`.";
     {
       url = dependency.resolved;
       # FIXME: for backwards compatibility we should probably set the
@@ -49,7 +30,7 @@ rec {
       parts = builtins.split "[:#/]" str;
     in
     assert !(builtins.length parts == 7) ->
-      throw "failed to parse GitHub reference `${str}`. Expected a string of format `github:org/repo#revision`";
+      util.throw "failed to parse GitHub reference `${str}`. Expected a string of format `github:org/repo#revision`";
     rec {
       inherit parts;
       org = builtins.elemAt parts 2;
@@ -57,36 +38,6 @@ rec {
       rev = builtins.elemAt parts 6;
     };
 
-  # Description: Takes an attribute set describing a git dependency and returns
-  # a .tgz of the repository as store path. If the attribute hash contains a
-  # hash attribute it will provide the value to `fetchFromGitHub` which will
-  # also work in restricted evaluation.
-  # Type: Set -> Path
-  buildTgzFromGitHub = { name, org, repo, rev, ref, hash ? null, sourceOptions ? { } }:
-    let
-      src =
-        if hash != null then
-          fetchFromGitHub
-            {
-              owner = org;
-              inherit repo;
-              inherit rev;
-              sha256 = hash; # FIXME: what if sha3?
-            } else
-          fetchGitWrapped {
-            url = "https://github.com/${org}/${repo}";
-            inherit rev ref;
-            allRefs = true;
-          };
-
-      sourceInfo = {
-        github = { inherit org repo rev ref; };
-      };
-      drv = packTgz sourceOptions.nodejs name ref src;
-    in
-    if sourceOptions ? sourceOverrides.${name}
-    then sourceOptions.sourceOverrides.${name} sourceInfo drv
-    else drv;
 
   # Description: Packs a source directory into a .tgz tar archive. If the
   # source is an archive, it gets unpacked first.
@@ -120,16 +71,17 @@ rec {
       v = parseGitHubRef dependency.version;
       f = parseGitHubRef dependency.from;
     in
-    assert v.org != f.org -> throw "version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
-    assert v.repo != f.repo -> throw "version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
-    assert !isGitRev v.rev -> throw "version of `${name}` does not specify a valid git rev: `${v.rev}`";
+    assert v.org != f.org -> util.throw "version and from of `${name}` disagree on the GitHub org to fetch from: `${v.org}` vs `${f.org}`";
+    assert v.repo != f.repo -> util.throw "version and from of `${name}` disagree on the GitHub repo to fetch from: `${v.repo}` vs `${f.repo}`";
+    assert !isGitRev v.rev -> util.throw "version of `${name}` does not specify a valid git rev: `${v.rev}`";
     let
-      src = buildTgzFromGitHub {
+      src = util.buildTgzFromGitHub {
         name = "${name}.tgz";
         ref = f.rev;
         inherit (v) org repo rev;
         hash = sourceHashFunc { type = "github"; value = v; };
         inherit sourceOptions;
+        pack = packTgz;
       };
     in
     (builtins.removeAttrs dependency [ "from" ]) // {
@@ -139,7 +91,7 @@ rec {
   # Description: Checks if the given string looks like a vila HTTP or HTTPS url
   # Type: String -> Bool
   looksLikeUrl = s:
-    assert (builtins.typeOf s != "string") -> throw "can only check strings if they are URL-like";
+    assert (builtins.typeOf s != "string") -> util.throw "can only check strings if they are URL-like";
     lib.hasPrefix "http://" s || lib.hasPrefix "https://" s;
 
   # Description: Checks the given dependency spec if its version field should
@@ -179,16 +131,16 @@ rec {
   # Type: { sourceHashFunc :: Fn } -> String -> Set -> Derivation
   makeSource = sourceOptions: name: dependency:
     assert (builtins.typeOf name != "string") ->
-      throw "Name of dependency ${toString name} must be a string";
+      util.throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf dependency != "set") ->
-      throw "Specification of dependency ${toString name} must be a set";
+      util.throw "Specification of dependency ${toString name} must be a set";
     if dependency ? resolved && dependency ? integrity then
       makeUrlSource sourceOptions name dependency
     else if dependency ? from && dependency ? version then
       makeGithubSource sourceOptions name dependency
     else if shouldUseVersionAsUrl dependency then
       makeSource sourceOptions name (dependency // { resolved = dependency.version; })
-    else throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
+    else util.throw "A valid dependency consists of at least the resolved and integrity field. Missing one or both of them for `${name}`. The object I got looks like this: ${builtins.toJSON dependency}";
 
   # Description: Parses the lock file as json and returns an attribute set
   # Type: Path -> Set
@@ -199,7 +151,7 @@ rec {
     in
     assert
     builtins.typeOf json != "set" ->
-    throw "The NPM lockfile must be a valid JSON object";
+    util.throw "The NPM lockfile must be a valid JSON object";
     # if a lockfile doesn't declare dependencies ensure that we have an empty
     # set. This makes the consuming code eaiser.
     if json ? dependencies then json else json // { dependencies = { }; };
@@ -210,12 +162,13 @@ rec {
     let
       gitAttrs = parseGitHubRef str;
     in
-    buildTgzFromGitHub {
+    util.buildTgzFromGitHub {
       name = "${name}.tgz";
       ref = gitAttrs.rev;
       inherit (gitAttrs) org repo rev;
       hash = sourceHashFunc { type = "github"; value = gitAttrs; };
       inherit sourceOptions;
+      pack = packTgz;
     };
 
   # Description: Patch the `requires` attributes of a dependency spec to refer to paths in the store
@@ -231,9 +184,9 @@ rec {
   # Type: List String -> { sourceHashFunc :: Fn } -> String -> Set -> { result :: Set, integrityUpdates :: List { path, file } }
   patchDependency = path: sourceOptions: name: spec:
     assert (builtins.typeOf name != "string") ->
-      throw "Name of dependency ${toString name} must be a string";
+      util.throw "Name of dependency ${toString name} must be a string";
     assert (builtins.typeOf spec != "set") ->
-      throw "spec of dependency ${toString name} must be a set";
+      util.throw "spec of dependency ${toString name} must be a set";
     let
       isBundled = spec ? bundled && spec.bundled == true;
       hasGitHubRequires = spec: (spec ? requires) && (lib.any (x: lib.hasPrefix "github:" x) (lib.attrValues spec.requires));
@@ -261,7 +214,7 @@ rec {
   # Type: { sourceHashFunc :: Fn } -> Path -> { result :: Set, integrityUpdates :: List { path, file } }
   patchLockfile = sourceOptions: file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
-      throw "file ${toString file} must be a path or string";
+      util.throw "file ${toString file} must be a path or string";
     let
       content = readLockfile file;
       dependencies = lib.mapAttrs (name: patchDependency [ name ] sourceOptions name) content.dependencies;
@@ -277,7 +230,7 @@ rec {
   # Type: Path -> Set
   patchPackagefile = file:
     assert (builtins.typeOf file != "path" && builtins.typeOf file != "string") ->
-      throw "file ${toString file} must be a path or string";
+      util.throw "file ${toString file} must be a path or string";
     let
       # Read the file but also add empty `devDependencies` and `dependencies`
       # if either are missing
@@ -315,51 +268,7 @@ rec {
       integrityUpdates = patched.integrityUpdates;
     };
 
-  # Description: Turn a derivation (with name & src attribute) into a directory containing the unpacked sources
-  # Type: Derivation -> Derivation
-  nodeSource = nodejs: runCommand "node-sources-${nodejs.version}"
-    { } ''
-    tar --no-same-owner --no-same-permissions -xf ${nodejs.src}
-    mv node-* $out
-  '';
 
-  # Description: Creates shell scripts to provide node_modules to the environment supporting
-  # two different modes: "symlink" and "copy"
-  # Type: Derivation -> String -> String
-  add_node_modules_to_cwd = node_modules: mode:
-    ''
-      # If node_modules is a managed symlink we can safely remove it and install a new one
-      ${lib.optionalString (mode == "symlink") ''
-        if [[ "$(readlink -f node_modules)" == ${builtins.storeDir}* ]]; then
-          rm -f node_modules
-        fi
-      ''}
-      if test -e node_modules; then
-        echo '[npmlock2nix] There is already a `node_modules` directory. Not replacing it.' >&2
-        exit 1
-      fi
-    '' +
-    (
-      if mode == "copy" then ''
-        cp --no-preserve=mode -r ${node_modules}/node_modules node_modules
-        chmod -R u+rw node_modules
-      '' else if mode == "symlink" then ''
-        ln -s ${node_modules}/node_modules node_modules
-      '' else throw "node_modules_mode must be either `copy` or `symlink`"
-    ) + ''
-      export NODE_PATH="$(pwd)/node_modules:$NODE_PATH"
-    '';
-
-  # Description: Extract the attributes that are relevant for building node_modules and use
-  # them as defaults in case the node_modules_attrs attribute doesn't have
-  # them.
-  # Type: Set -> Set
-  get_node_modules_attrs = { node_modules_attrs ? { }, ... }@attrs:
-    let
-      getAttr = name: from: lib.optionalAttrs (builtins.hasAttr name from) { "${name}" = from.${name}; };
-      getAttrs = names: from: lib.foldl (a: b: a // (getAttr b from)) { } names;
-    in
-    (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
 
   # Description: Takes a dependency spec and a map of github sources/hashes and returns either the map or 'null'
   # Type: Set -> Set -> Set | null
@@ -374,7 +283,7 @@ rec {
         )
         githubSourceHashMap
     else
-      throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
+      util.throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
   node_modules =
     { src
@@ -392,9 +301,9 @@ rec {
     , ...
     }@args:
       assert lib.versionAtLeast nodejs.version "15.0" ->
-        throw "npmlock2nix is called with nodejs version ${nodejs.version}, which is currently not supported, see https://github.com/nix-community/npmlock2nix/issues/153 for more information";
+        util.throw "npmlock2nix is called with nodejs version ${nodejs.version}, which is currently not supported, see https://github.com/nix-community/npmlock2nix/issues/153 for more information";
       assert (builtins.typeOf preInstallLinks != "set") ->
-        throw "`preInstallLinks` must be an attributeset of attributesets";
+        util.throw "`preInstallLinks` must be an attributeset of attributesets";
       let
         cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "preInstallLinks" "sourceOverrides" "githubSourceHashMap" ];
         lockfile = readLockfile packageLockJson;
@@ -506,7 +415,7 @@ rec {
           declare -pf > $TMP/preinstall-env
           ln -s ${preinstall_node_modules}/node_modules/.hooks/prepare node_modules/.hooks/preinstall
           export HOME=.
-          npm install --offline --nodedir=${nodeSource nodejs}
+          npm install --offline --nodedir=${util.nodeSource nodejs}
           test -d node_modules/.bin && patchShebangs node_modules/.bin
           rm -rf node_modules/.hooks
           runHook postBuild
@@ -540,14 +449,14 @@ rec {
     , ...
     }@attrs:
     let
-      nm = node_modules (get_node_modules_attrs attrs);
+      nm = node_modules (util.get_node_modules_attrs attrs);
       extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" "shellHook" "buildInputs" ];
     in
     mkShell ({
       buildInputs = buildInputs ++ [ nm.nodejs nm ];
       shellHook = ''
         # FIXME: we should somehow register a GC root here in case of a symlink?
-        ${add_node_modules_to_cwd nm node_modules_mode}
+        ${util.add_node_modules_to_cwd nm node_modules_mode}
       '' + shellHook;
       passthru = passthru // {
         node_modules = nm;
@@ -565,7 +474,7 @@ rec {
     , ...
     }@attrs:
     let
-      nm = node_modules (get_node_modules_attrs attrs);
+      nm = node_modules (util.get_node_modules_attrs attrs);
       extraAttrs = builtins.removeAttrs attrs [ "node_modules_attrs" "passthru" "buildInputs" ];
     in
     stdenv.mkDerivation ({
@@ -574,7 +483,7 @@ rec {
       buildInputs = [ nm ] ++ buildInputs;
       inherit src installPhase;
 
-      preConfigure = add_node_modules_to_cwd nm node_modules_mode;
+      preConfigure = util.add_node_modules_to_cwd nm node_modules_mode;
 
       buildPhase = ''
         runHook preBuild
