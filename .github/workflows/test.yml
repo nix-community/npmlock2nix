@@ -14,7 +14,7 @@ jobs:
       - uses: cachix/cachix-action@v11
         with:
           name: npmlock2nix
-          signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - run: nix-shell --run "nixpkgs-fmt --check ."
       - name: Try latest stable Nix release
         run:  nix-shell -I nixpkgs=nix -p nix --run ./test.sh
