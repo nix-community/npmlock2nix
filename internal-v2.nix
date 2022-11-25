@@ -209,7 +209,14 @@ rec {
   # Type: { sourceOverrides :: Fn, nodejs :: Package } -> String -> String -> String -> String -> { resolved :: Path, integrity :: String }
   makeUrlSource = { sourceOverrides ? { }, nodejs, ... }: name: version: resolved: integrity:
     let
-      src = fetchurl { url = resolved; hash = integrity; };
+      src = fetchurl {
+        # Npm strips the query strings when opening a "file://.*" name.
+        # We need to make sure we strip the query string before adding
+        # the file to the store.
+        name = builtins.elemAt (lib.splitString "?" (builtins.baseNameOf resolved)) 0;
+        url = resolved;
+        hash = integrity;
+      };
       sourceInfo = {
         version = version;
       };

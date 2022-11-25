@@ -70,6 +70,18 @@ in
       [ (res.version == "4.0.0") (lib.hasPrefix "file:///nix/store" res.resolved) (res.integrity == "sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==") ];
     expected = [ true true true ];
   };
+  testPatchDepRegistryWithQueryString = {
+    expr =
+      let
+        res = (i.patchPackage noSourceOptions "node_modules/@rjsf/bootstrap-5" {
+          version = "4.2.0";
+          resolved = "https://github.com/nurikk/fileshare/blob/main/rjsf-bootstrap-5-4.2.0.tgz?raw=true";
+          integrity = "sha512-gHwtGSeteSl3LiSOk+rIENiVjI7yaMTYcxqroXZxErstz/5WcZV5Wme+8XCYBB7yLhMiWPvNlDS9Nr4urADIdQ==";
+        });
+      in
+      [ (res.version == "4.2.0") (lib.hasPrefix "file:///nix/store" res.resolved) (lib.hasSuffix ".tgz" res.resolved) (res.integrity == "sha512-gHwtGSeteSl3LiSOk+rIENiVjI7yaMTYcxqroXZxErstz/5WcZV5Wme+8XCYBB7yLhMiWPvNlDS9Nr4urADIdQ==") ];
+    expected = [ true true true true ];
+  };
   testPatchDepGithub = {
     expr =
       let
