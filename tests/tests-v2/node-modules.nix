@@ -125,7 +125,7 @@ testLib.runTests {
       drv = npmlock2nix.v2.node_modules {
         src = ./examples-projects/native-extensions;
         buildInputs = [ python3 ];
-        sourceOverrides = with npmlock2nix.v2.node_modules; {
+        sourceOverrides = with npmlock2nix.v2; {
           "@mapbox/node-pre-gyp" = packageRequirePatchShebangs;
         };
       };

@@ -2,7 +2,13 @@
 rec {
   default_nodejs = nodejs-16_x;
 
-  SENTINEL_VALUE = builtins.hashString "sha1" (toString ./.);
+  ## helper functions that allow users to define common source override mechanism
+
+  # no-op function that serves as a marker in the `sourceOverrides`
+  # code. If an override is set the source is passed through the
+  # entire override mechanism which does, as a side effect, patch the
+  # shebangs in the source tarball.
+  packageRequirePatchShebangs = sourceInfo: drv: drv;
 
   # builtins.fetchGit wrapper that ensures compatibility with Nix 2.3 and Nix 2.4
   # Type: Attrset -> Path
@@ -220,14 +226,14 @@ rec {
       sourceInfo = {
         version = version;
       };
-      drv = (packTgz nodejs name version src);
+      drv = packTgz nodejs name version src;
       tgz = (
         if sourceOverrides ? ${name} then
         # If we have modification to this source, unpack the tgz, apply the
         # patches and repack the tgz
           sourceOverrides.${name} sourceInfo drv
         else
-          if sourceOverrides.buildRequirePatchShebangs or false == node_modules.buildRequirePatchShebangs then drv else src
+          if sourceOverrides.buildRequirePatchShebangs or false then drv else src
       );
     in
     {
@@ -419,95 +425,91 @@ rec {
       throw "sourceHashFunc: spec.type '${spec.type}' is not supported. Supported types: 'github'";
 
   node_modules =
-    {
-      __functor = self: { src
-                        , packageJson ? src + "/package.json"
-                        , packageLockJson ? src + "/package-lock.json"
-                        , buildInputs ? [ ]
-                        , nativeBuildInputs ? [ ]
-                        , nodejs ? default_nodejs
-                        , preBuild ? ""
-                        , postBuild ? ""
-                        , preInstallLinks ? null
-                        , sourceOverrides ? { }
-                        , githubSourceHashMap ? { }
-                        , passthru ? { }
-                        , ...
-                        }@args:
-        assert (preInstallLinks != null) ->
-          throw "`preInstallLinks` was removed use `sourceOverrides";
-        let
-          cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
-          lockfile = readPackageLikeFile packageLockJson;
-          packagefile = readPackageLikeFile packageJson;
+    { src
+    , packageJson ? src + "/package.json"
+    , packageLockJson ? src + "/package-lock.json"
+    , buildInputs ? [ ]
+    , nativeBuildInputs ? [ ]
+    , nodejs ? default_nodejs
+    , preBuild ? ""
+    , postBuild ? ""
+    , preInstallLinks ? null
+    , sourceOverrides ? { }
+    , githubSourceHashMap ? { }
+    , passthru ? { }
+    , ...
+    }@args:
+      assert (preInstallLinks != null) ->
+        throw "`preInstallLinks` was removed use `sourceOverrides";
+      let
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
+        lockfile = readPackageLikeFile packageLockJson;
+        packagefile = readPackageLikeFile packageJson;
 
-          sourceOptions = {
-            sourceHashFunc = sourceHashFunc githubSourceHashMap;
-            inherit nodejs sourceOverrides;
-            packagesVersions = lockfile.packages or { };
-          };
+        sourceOptions = {
+          sourceHashFunc = sourceHashFunc githubSourceHashMap;
+          inherit nodejs sourceOverrides;
+          packagesVersions = lockfile.packages or { };
+        };
 
-          allDependenciesNames = builtins.attrNames (packagefile.dependencies // packagefile.devDependencies or { });
+        allDependenciesNames = builtins.attrNames (packagefile.dependencies // packagefile.devDependencies or { });
 
-          patchedLockfilePath = patchedLockfile sourceOptions lockfile;
-          patchedPackagefilePath = patchedPackagefile sourceOptions packagefile;
-        in
-        assert lockfile.lockfileVersion == 2 && lib.versionOlder nodejs.version "15.0"
-          -> throw "npm lockfile V2 require nodejs version >= 15, it is not supported by nodejs ${nodejs.version}";
-        stdenv.mkDerivation ({
-          pname = lib.strings.sanitizeDerivationName lockfile.name;
-          version = lockfile.version or "0";
-          dontUnpack = true;
+        patchedLockfilePath = patchedLockfile sourceOptions lockfile;
+        patchedPackagefilePath = patchedPackagefile sourceOptions packagefile;
+      in
+      assert lockfile.lockfileVersion == 2 && lib.versionOlder nodejs.version "15.0"
+        -> throw "npm lockfile V2 require nodejs version >= 15, it is not supported by nodejs ${nodejs.version}";
+      stdenv.mkDerivation ({
+        pname = lib.strings.sanitizeDerivationName lockfile.name;
+        version = lockfile.version or "0";
+        dontUnpack = true;
 
-          inherit nativeBuildInputs buildInputs preBuild postBuild;
-          propagatedBuildInputs = [
-            nodejs
-          ];
+        inherit nativeBuildInputs buildInputs preBuild postBuild;
+        propagatedBuildInputs = [
+          nodejs
+        ];
 
-          setupHooks = [
-            ./set-node-path.sh
-          ];
+        setupHooks = [
+          ./set-node-path.sh
+        ];
 
-          preConfigure = ''
-            export HOME=$(mktemp -d)
-          '';
+        preConfigure = ''
+          export HOME=$(mktemp -d)
+        '';
 
-          postPatch = ''
-            ln -sf ${patchedLockfilePath} package-lock.json
-            ln -sf ${patchedPackagefilePath} package.json
-          '';
+        postPatch = ''
+          ln -sf ${patchedLockfilePath} package-lock.json
+          ln -sf ${patchedPackagefilePath} package.json
+        '';
 
-          buildPhase = ''
-            runHook preBuild
-            export HOME=.
-            npm ci --nodedir=${nodeSource nodejs} --ignore-scripts
-            test -d node_modules/.bin && patchShebangs node_modules/.bin
-            npm rebuild --offline --nodedir=${nodeSource nodejs} ${builtins.concatStringsSep " " allDependenciesNames}
-            npm install --no-save --offline --nodedir=${nodeSource nodejs}
-            test -d node_modules/.bin && patchShebangs node_modules/.bin
-            runHook postBuild
-          '';
-          installPhase = ''
-            mkdir "$out"
-            if test -d node_modules; then
-              if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
-                mv node_modules $out/
-                if test -d $out/node_modules/.bin; then
-                  ln -s $out/node_modules/.bin $out/bin
-                fi
+        buildPhase = ''
+          runHook preBuild
+          export HOME=.
+          npm ci --nodedir=${nodeSource nodejs} --ignore-scripts
+          test -d node_modules/.bin && patchShebangs node_modules/.bin
+          npm rebuild --offline --nodedir=${nodeSource nodejs} ${builtins.concatStringsSep " " allDependenciesNames}
+          npm install --no-save --offline --nodedir=${nodeSource nodejs}
+          test -d node_modules/.bin && patchShebangs node_modules/.bin
+          runHook postBuild
+        '';
+        installPhase = ''
+          mkdir "$out"
+          if test -d node_modules; then
+            if [ $(ls -1 node_modules | wc -l) -gt 0 ] || [ -e node_modules/.bin ]; then
+              mv node_modules $out/
+              if test -d $out/node_modules/.bin; then
+                ln -s $out/node_modules/.bin $out/bin
               fi
             fi
-          '';
+          fi
+        '';
 
-          passthru = passthru // {
-            inherit nodejs;
-            lockfile = patchedLockfilePath;
-            packagesfile = patchedPackagefilePath;
-          };
-        } // cleanArgs);
-      packageRequirePatchShebangs = sourceInfo: drv: drv;
-      buildRequirePatchShebangs = SENTINEL_VALUE;
-    };
+        passthru = passthru // {
+          inherit nodejs;
+          lockfile = patchedLockfilePath;
+          packagesfile = patchedPackagefilePath;
+        };
+      } // cleanArgs);
 
   shell =
     { src

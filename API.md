@@ -152,8 +152,8 @@ The `sourceOverrides` argument expects an attribute set mapping npm package name
 `sourceOverrides` comes with default override mechanism like patching all npm packages binaries dependencies with `buildRequirePatchShebangs` or patching individual npm package binaries with `packageRequirePatchShebangs`.
 
 ```nix
-npmlock2nix.node_modules {
-  sourceOverrides = with npmlock2nix.node_modules; {
+npmlock2nix.v2.node_modules {
+  sourceOverrides = {
     # sourceInfo either contains:
     # - A version attribute
     # - A github = { org, repo, rev, ref } attribute for GitHub sources
@@ -168,10 +168,10 @@ npmlock2nix.node_modules {
     })
 
     # Patch all npm packages
-    inherit buildRequirePatchShebangs
+    buildRequirePatchShebangs = true;
 
     # Patch individual package
-    node-pre-gyp = packageRequirePatchShebangs
+    node-pre-gyp = npmlock2nix.v2.packageRequirePatchShebangs;
 
     # Link vendored binaries
     package-name = sourceInfo: drv: drv.overrideAttrs (old: {

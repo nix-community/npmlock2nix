@@ -2,7 +2,7 @@
 let
   v1_internal = pkgs.callPackage ./internal-v1.nix { };
   v2_internal = pkgs.callPackage ./internal-v2.nix { };
-  separatePublicAndInternalAPI = api: {
+  separatePublicAndInternalAPI = api: extraAttributes: {
     inherit (api) shell build node_modules;
 
     # *** WARNING ****
@@ -12,9 +12,9 @@ let
     internal = lib.warn "[npmlock2nix] You are using the unsupported internal API." (
       api
     );
-  };
-  v1 = separatePublicAndInternalAPI v1_internal;
-  v2 = separatePublicAndInternalAPI v2_internal;
+  } // (lib.listToAttrs (map (name: lib.nameValuePair name api.${name}) extraAttributes));
+  v1 = separatePublicAndInternalAPI v1_internal [ ];
+  v2 = separatePublicAndInternalAPI v2_internal [ "packageRequirePatchShebangs" ];
 in
 {
   inherit v1;
