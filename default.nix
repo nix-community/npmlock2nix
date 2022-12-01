@@ -15,9 +15,11 @@ let
   };
   v1 = separatePublicAndInternalAPI v1_internal;
   v2 = separatePublicAndInternalAPI v2_internal;
-  withWarning = f: lib.warn "[npmlock2nix] Using deprecated legacy accessors. Will be removed afer 2022-12-31. Please specify the v1 or v2 npm lockfile format you want to use through the top-level v1 and v2 attrsets." f;
 in
 {
-  inherit v1 v2;
+  inherit v1;
+  v2 = lib.mapAttrs (_: lib.warn "[npmlock2nix] You are using the new v2 beta api. The interface isn't stable yet. Please report any issues at https://github.com/nix-community/npmlock2nix/issues") v2;
   tests = pkgs.callPackage ./tests { };
-} // (lib.mapAttrs (_: withWarning) v1)
+} // (lib.mapAttrs
+  (lib.warn "[npmlock2nix] You are using the unversion prefix for builders. This is fine for now. In the future we will move to a versioned interface (old versions remain as they are). The currently used functions are availabe as `npmlock2nix.v1` for example `npmlock2nix.v1.build`.")
+  v1)
