@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "cachix",
         "repo": "pre-commit-hooks.nix",
-        "rev": "471c7f1ecace25e39099206431300322632d25c4",
-        "sha256": "091pgslw05f0mp0kwi33xiffvsix2bd2qcggjvp2mkyryh7qr9cm",
+        "rev": "2597510df32efafda4d05f5122efe612a7a5da66",
+        "sha256": "1cnniydmyvyqzf6nvp2b2hwsynf57h5iraplzkgm2jzyfqlgybd1",
         "type": "tarball",
-        "url": "https://github.com/cachix/pre-commit-hooks.nix/archive/471c7f1ecace25e39099206431300322632d25c4.tar.gz",
+        "url": "https://github.com/cachix/pre-commit-hooks.nix/archive/2597510df32efafda4d05f5122efe612a7a5da66.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
