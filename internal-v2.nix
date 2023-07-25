@@ -269,9 +269,9 @@ rec {
   patchPackage = sourceOptions@{ sourceHashFunc, ... }: raw_name: spec:
     assert (builtins.typeOf raw_name != "string") ->
       throw "Name of dependency ${toString raw_name} must be a string";
-    assert !(spec ? resolved || (spec ? inBundle && spec.inBundle == true)) ->
+    assert !(spec ? resolved || spec.link or false || spec.inBundle or false) ->
       throw "Missing resolved field for dependency ${toString raw_name}";
-    assert !(spec ? version) ->
+    assert !(spec ? version || spec.link or false) ->
       throw "Missing version field for dependency ${toString raw_name}";
     let
       name = genericPackageName raw_name;
@@ -283,7 +283,13 @@ rec {
       # relax those.
       patchDependencies = deps: lib.mapAttrs (_n: dep: if isGitHubRef dep || isGitHubRefWithoutRev dep then "*" else dep) deps;
       patchedResolved =
-        if (!isGitHubRef spec.resolved)
+        if spec.link or false then
+          {
+            resolved = "file://${sourceOptions.srcDir + "/" + spec.resolved}";
+            integrity = null;
+            link = true;
+          }
+        else if (!isGitHubRef spec.resolved)
         then makeUrlSource sourceOptions name spec.version spec.resolved defaultedIntegrity
         else
           let
@@ -301,7 +307,7 @@ rec {
           };
     in
     (builtins.removeAttrs spec [ "peerDependencies" ]) //
-    lib.optionalAttrs (spec ? resolved) {
+    lib.optionalAttrs (spec ? resolved && !(spec.link or false)) {
       inherit (patchedResolved) resolved integrity;
     } // lib.optionalAttrs (spec ? dependencies) {
       dependencies = (patchDependencies spec.dependencies);
@@ -316,7 +322,7 @@ rec {
     let
       contentWithoutDependencies = builtins.removeAttrs content [ "dependencies" ];
       packagesWithoutSelf = lib.filterAttrs (n: v: n != "") content.packages;
-      topLevelPackage = lib.filterAttrs (n: v: n == "") content.packages;
+      topLevelPackage = lib.filterAttrs (n: v: n == "" || lib.hasPrefix "." n) content.packages;
       patchedPackages = lib.mapAttrs (name: patchPackage sourceOptions name) packagesWithoutSelf;
     in
     assert !(content ? packages) ->
@@ -407,7 +413,7 @@ rec {
       getAttr = name: from: lib.optionalAttrs (builtins.hasAttr name from) { "${name}" = from.${name}; };
       getAttrs = names: from: lib.foldl (a: b: a // (getAttr b from)) { } names;
     in
-    (getAttrs [ "src" "nodejs" ] attrs // node_modules_attrs);
+    (getAttrs [ "src" "srcDir" "nodejs" ] attrs // node_modules_attrs);
 
   # Description: Takes a dependency spec and a map of github sources/hashes and returns either the map or 'null'
   # Type: Set -> Set -> Set | null
@@ -426,6 +432,7 @@ rec {
 
   node_modules =
     { src
+    , srcDir ? src
     , packageJson ? src + "/package.json"
     , packageLockJson ? src + "/package-lock.json"
     , buildInputs ? [ ]
@@ -448,7 +455,7 @@ rec {
 
         sourceOptions = {
           sourceHashFunc = sourceHashFunc githubSourceHashMap;
-          inherit nodejs sourceOverrides;
+          inherit nodejs sourceOverrides srcDir;
           packagesVersions = lockfile.packages or { };
         };
 
@@ -513,6 +520,7 @@ rec {
 
   shell =
     { src
+    , srcDir ? src
     , node_modules_mode ? "symlink"
     , node_modules_attrs ? { }
     , buildInputs ? [ ]
@@ -537,6 +545,7 @@ rec {
 
   build =
     { src
+    , srcDir ? src
     , buildCommands ? [ "npm run build" ]
     , installPhase
     , node_modules_attrs ? { }
