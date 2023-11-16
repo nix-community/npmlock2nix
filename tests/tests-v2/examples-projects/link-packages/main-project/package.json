@@ -1,0 +1,11 @@
+{
+  "name": "main-project",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo Nothing to build"
+  },
+  "dependencies": {
+    "linked-project": "file:../linked-project"
+  }
+}
