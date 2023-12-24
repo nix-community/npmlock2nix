@@ -41,7 +41,7 @@ rec {
         ((builtins.elemAt parts 0) == "github") ||
         ((builtins.elemAt parts 2) == "github.com") ||
         ((builtins.elemAt parts 2) == "github") ||
-        ((builtins.elemAt parts 8) == "github.com")
+        (partsLen > 7 && (builtins.elemAt parts 8) == "github.com")
       )
     else false;
 
@@ -56,6 +56,10 @@ rec {
       partsLen = builtins.length parts;
     in
     partsLen == 5 && builtins.elemAt parts 0 == "github";
+
+  # Description: Checks if a string looks like a valid local package reference
+  # Type: String -> Boolean
+  isLocalPackage = name: (lib.hasPrefix "file:" name || lib.hasPrefix "/" name || lib.hasPrefix "." name);
 
   # Description: Takes a string of the format
   # "git+ssh://git@github.com/owner/repo.git#revision",
@@ -266,12 +270,12 @@ rec {
   # URL stored in the integrity field with nix store path.
   # spec :: {version :: String, resolved :: String, integrity :: String }.
   # Type: { version :: String, resolved :: String, integrity :: String }
-  patchPackage = sourceOptions@{ sourceHashFunc, ... }: raw_name: spec:
+  patchPackage = sourceOptions@{ sourceHashFunc, localPackages, ... }: raw_name: spec:
     assert (builtins.typeOf raw_name != "string") ->
       throw "Name of dependency ${toString raw_name} must be a string";
-    assert !(spec ? resolved || (spec ? inBundle && spec.inBundle == true)) ->
+    assert !(spec ? resolved || (spec ? inBundle && spec.inBundle == true) || (isLocalPackage raw_name)) ->
       throw "Missing resolved field for dependency ${toString raw_name}";
-    assert !(spec ? version) ->
+    assert !(spec ? version || (isLocalPackage raw_name) || (isLocalPackage spec.resolved)) ->
       throw "Missing version field for dependency ${toString raw_name}";
     let
       name = genericPackageName raw_name;
@@ -281,11 +285,10 @@ rec {
       # version.
       # We already pinned everything through the "resolved", we can
       # relax those.
-      patchDependencies = deps: lib.mapAttrs (_n: dep: if isGitHubRef dep || isGitHubRefWithoutRev dep then "*" else dep) deps;
+      patchDependencies = deps: lib.mapAttrs (_n: dep: if isGitHubRef dep || isGitHubRefWithoutRev dep || isLocalPackage dep then "*" else dep) deps;
       patchedResolved =
-        if (!isGitHubRef spec.resolved)
-        then makeUrlSource sourceOptions name spec.version spec.resolved defaultedIntegrity
-        else
+        if (isGitHubRef spec.resolved)
+        then
           let
             ghRef = parseGitHubRef spec.resolved;
             ghTgz = buildTgzFromGitHub {
@@ -298,12 +301,39 @@ rec {
           {
             resolved = "file://" + (toString ghTgz);
             integrity = null;
-          };
+          }
+        else if (isLocalPackage spec.resolved || isLocalPackage raw_name) then
+          {
+            version = "*";
+            resolved = "file://" + localPackages."${name}";
+            integrity = null;
+            link = false;
+          }
+        else
+          makeUrlSource sourceOptions name spec.version spec.resolved defaultedIntegrity;
     in
-    (builtins.removeAttrs spec [ "peerDependencies" ]) //
+    (builtins.removeAttrs spec [ "peerDependencies" "link" ]) //
     lib.optionalAttrs (spec ? resolved) {
       inherit (patchedResolved) resolved integrity;
     } // lib.optionalAttrs (spec ? dependencies) {
+      dependencies = (patchDependencies spec.dependencies);
+    };
+
+
+  # Description: Patch the toplevel lockfile v2 package entry. It'll replace the
+  # versions of any git or local dependencies with '*'
+  # spec :: {version :: String, resolved :: String, integrity :: String }.
+  # Type: { version :: String, resolved :: String, integrity :: String }
+  patchTopLevelPackage = sourceOptions@{ sourceHashFunc, localPackages, ... }: raw_name: spec:
+    let
+      # Relaxing dependencies version bounds: it could be a GitHub
+      # ref, forcing NPM to checkout the remote repo to get the actual
+      # version.
+      # We already pinned everything through the "resolved", we can
+      # relax those.
+      patchDependencies = deps: lib.mapAttrs (_n: dep: if isGitHubRef dep || isGitHubRefWithoutRev dep || isLocalPackage dep then "*" else dep) deps;
+    in
+    spec // lib.optionalAttrs (spec ? dependencies) {
       dependencies = (patchDependencies spec.dependencies);
     };
 
@@ -318,16 +348,17 @@ rec {
       packagesWithoutSelf = lib.filterAttrs (n: v: n != "") content.packages;
       topLevelPackage = lib.filterAttrs (n: v: n == "") content.packages;
       patchedPackages = lib.mapAttrs (name: patchPackage sourceOptions name) packagesWithoutSelf;
+      patchedTopLevelPackages = lib.mapAttrs (name: patchTopLevelPackage sourceOptions name) topLevelPackage;
     in
     assert !(content ? packages) ->
       throw "Missing the packages top-level key in your lockfile. Are you sure it is a npm lockfile v2?";
     {
       result = contentWithoutDependencies // {
-        packages = patchedPackages // topLevelPackage;
+        packages = patchedPackages // patchedTopLevelPackages;
       };
     };
 
-  # Description: Rewrite all the `github:` references to wildcards.
+  # Description: Rewrite all the `github:` and `path:` references to wildcards.
   # Type: Path -> Set
   patchPackagefile = sourceOptions: content:
     let
@@ -339,7 +370,7 @@ rec {
         # because it only contains the branch name. Therefore we cannot substitute with a nix store path.
         # If we leave the dependency unchanged, npm will try to resolve it and fail. We therefore substitute with a
         # wildcard dependency, which will make npm look at the lockfile.
-        if ((isGitHubRef version) || (lib.hasPrefix "http" version)) then
+        if ((isGitHubRef version) || (lib.hasPrefix "http" version) || (lib.hasPrefix "file:" version)) then
           "*"
         else if version == "latest" then sourceOptions.packagesVersions.${name}.version else version);
       dependencies = if (content ? dependencies) then lib.mapAttrs patchDep content.dependencies else { };
@@ -436,19 +467,20 @@ rec {
     , preInstallLinks ? null
     , sourceOverrides ? { }
     , githubSourceHashMap ? { }
+    , localPackages ? { }
     , passthru ? { }
     , ...
     }@args:
       assert (preInstallLinks != null) ->
         throw "`preInstallLinks` was removed use `sourceOverrides";
       let
-        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" ];
+        cleanArgs = builtins.removeAttrs args [ "src" "packageJson" "packageLockJson" "buildInputs" "nativeBuildInputs" "nodejs" "preBuild" "postBuild" "sourceOverrides" "githubSourceHashMap" "localPackages" ];
         lockfile = readPackageLikeFile packageLockJson;
         packagefile = readPackageLikeFile packageJson;
 
         sourceOptions = {
           sourceHashFunc = sourceHashFunc githubSourceHashMap;
-          inherit nodejs sourceOverrides;
+          inherit nodejs sourceOverrides localPackages;
           packagesVersions = lockfile.packages or { };
         };
 
