@@ -32,6 +32,9 @@ let
       require-from-string = "^2.0.2";
     };
   };
+  localLeftPadOptions = noSourceOptions // {
+    localPackages.leftpad = ./examples-projects/local-leftpad;
+  };
 in
 (testLib.runTests {
   testGhSourceRef = {
@@ -114,5 +117,16 @@ in
       in
       result ? peerDependencies;
     expected = false;
+  };
+  testPatchDepLocal = {
+    expr =
+      let
+        res = (i.patchPackage localLeftPadOptions "node_modules/leftpad" {
+          resolved = "../leftpad";
+          link = true;
+        });
+      in
+      [ (lib.hasPrefix "file:///nix/store" res.resolved) (res.integrity == null) ];
+    expected = [ true true ];
   };
 })
