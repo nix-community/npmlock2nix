@@ -270,7 +270,7 @@ rec {
   # URL stored in the integrity field with nix store path.
   # spec :: {version :: String, resolved :: String, integrity :: String }.
   # Type: { version :: String, resolved :: String, integrity :: String }
-  patchPackage = sourceOptions@{ sourceHashFunc, localPackages, ... }: raw_name: spec:
+  patchPackage = sourceOptions@{ sourceHashFunc, localPackages ? { }, ... }: raw_name: spec:
     assert (builtins.typeOf raw_name != "string") ->
       throw "Name of dependency ${toString raw_name} must be a string";
     assert !(spec ? resolved || (spec ? inBundle && spec.inBundle == true) || (isLocalPackage raw_name)) ->

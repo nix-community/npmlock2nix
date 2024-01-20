@@ -1,4 +1,4 @@
-{ npmlock2nix, testLib, runCommand, nodejs-16_x, nodejs-17_x, python3 }:
+{ npmlock2nix, testLib, runCommand, nodejs-16_x, nodejs-17_x, python3, lib }:
 testLib.runTests {
   testNodeModulesForEmptyDependencies = {
     expr =
@@ -161,4 +161,18 @@ testLib.runTests {
       expr = builtins.pathExists drv.outPath;
       expected = true;
     };
+
+  testLocalDependency = {
+    expr =
+      let
+        drv = npmlock2nix.v2.node_modules {
+          src = ./examples-projects/local-dependency;
+          localPackages = {
+            leftpad = ./examples-projects/local-leftpad;
+          };
+        };
+      in
+      builtins.pathExists (drv + "/node_modules/leftpad");
+    expected = true;
+  };
 }
